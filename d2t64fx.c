@@ -31,20 +31,20 @@ void DEC_ACELP_2t64_fx(
 
     for (i = 0; i < L_CODE; i++)
     {
-        code[i] = 0;                       move16();
+        code[i] = 0;                       
     }
 
     /* decode the positions and signs of pulses and build the codeword */
 
-    i0 = (Word16) (shr(index, 5) & 0x003E);logic16();
-    i1 = (Word16) (add(shl((Word16) (index & 0x001F), 1), 1));  logic16();
-    test();logic16();
+    i0 = (Word16) (shr(index, 5) & 0x003E);
+    i1 = (Word16) (add(shl((Word16) (index & 0x001F), 1), 1));  
+    
     if ((shr(index, 6) & NB_POS) == 0)
         code[i0] = 512;
     else
         code[i0] = -512;
 
-    test();logic16();
+    
     if ((index & NB_POS) == 0)
         code[i1] = 512;
     else

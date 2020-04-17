@@ -56,7 +56,7 @@ Word16 Pitch_fr4(                          /* (o)     : pitch period.           
     t_max = add(t0_max, L_INTERPOL1);
 
     corr = &corr_v[-t_min];
-    move16();
+    
 
     /* Compute normalized correlation between target and filtered excitation */
 
@@ -65,26 +65,26 @@ Word16 Pitch_fr4(                          /* (o)     : pitch period.           
     /* Find integer pitch */
 
     max = corr[t0_min];
-    move16();
+    
     t0 = t0_min;
-    move16();
+    
 
     for (i = add(t0_min, 1); i <= t0_max; i++)
     {
-        test();
+        
         if (sub(corr[i], max) >= 0)
         {
-            max = corr[i];                 move16();
-            t0 = i;                        move16();
+            max = corr[i];                 
+            t0 = i;                        
         }
     }
 
     /* If first subframe and t0 >= t0_fr1, do not search fractionnal pitch */
-    test();test();
+    
     if ((i_subfr == 0) && (sub(t0, t0_fr1) >= 0))
     {
         *pit_frac = 0;
-        move16();
+        
         return (t0);
     }
     /*------------------------------------------------------------------*
@@ -94,22 +94,22 @@ Word16 Pitch_fr4(                          /* (o)     : pitch period.           
      *------------------------------------------------------------------*/
 
     step = 1;
-    move16();                              /* 1/4 subsample resolution */
+                                  /* 1/4 subsample resolution */
     fraction = -3;
-    move16();
-    test();test();test();
+    
+    
     if (((i_subfr == 0) && (sub(t0, t0_fr2) >= 0)) || (sub(t0_fr2, PIT_MIN) == 0))
     {
         step = 2;
-        move16();                          /* 1/2 subsample resolution */
+                                  /* 1/2 subsample resolution */
         fraction = -2;
-        move16();
+        
     }
-    test();
+    
     if (sub(t0, t0_min) == 0)
     {
         fraction = 0;
-        move16();
+        
     }
     max = Interpol_4(&corr[t0], fraction);
 
@@ -117,25 +117,25 @@ Word16 Pitch_fr4(                          /* (o)     : pitch period.           
     {
         temp = Interpol_4(&corr[t0], i);
 
-        test();
+        
         if (sub(temp, max) > 0)
         {
             max = temp;
-            move16();
+            
             fraction = i;
-            move16();
+            
         }
     }
 
     /* limit the fraction value in the interval [0,1,2,3] */
-    test();
+    
     if (fraction < 0)
     {
         fraction = add(fraction, UP_SAMP);
         t0 = sub(t0, 1);
     }
     *pit_frac = fraction;
-    move16();
+    
 
     return (t0);
 }
@@ -171,7 +171,7 @@ static void Norm_Corr(
 
     /* Compute rounded down 1/sqrt(energy of xn[]) */
 
-    L_tmp = 1L;                            move32();
+    L_tmp = 1L;                            
     for (i = 0; i < L_subfr; i++)
         L_tmp = L_mac(L_tmp, xn[i], xn[i]);
 
@@ -187,7 +187,7 @@ static void Norm_Corr(
     {
         /* Compute correlation between xn[] and excf[] */
 
-        L_tmp = 1L;                        move32();
+        L_tmp = 1L;                        
         for (i = 0; i < L_subfr; i++)
             L_tmp = L_mac(L_tmp, xn[i], excf[i]);
 
@@ -199,7 +199,7 @@ static void Norm_Corr(
 
         /* Compute 1/sqrt(energy of excf[]) */
 
-        L_tmp = 1L;                        move32();
+        L_tmp = 1L;                        
         for (i = 0; i < L_subfr; i++)
             L_tmp = L_mac(L_tmp, excf[i], excf[i]);
 
@@ -215,20 +215,20 @@ static void Norm_Corr(
         L_tmp = L_mult(corr, norm);
         L_tmp = L_shl(L_tmp, add(add(exp_corr, exp_norm), scale));
 
-        corr_norm[t] = round(L_tmp);       move16();
+        corr_norm[t] = round(L_tmp);       
 
         /* modify the filtered excitation excf[] for the next iteration */
 
-        test();
+        
         if (sub(t, t_max) != 0)
         {
-            k--;                           move16();
+            k--;                           
             for (i = (Word16) (L_subfr - 1); i > 0; i--)
             {
                 /* saturation can occur in add() */
-                excf[i] = add(mult(exc[k], h[i]), excf[i - 1]); move16();
+                excf[i] = add(mult(exc[k], h[i]), excf[i - 1]); 
             }
-            excf[0] = mult(exc[k], h[0]);  move16();
+            excf[0] = mult(exc[k], h[0]);  
         }
     }
 
@@ -273,17 +273,17 @@ static Word16 Interpol_4(                  /* (o)  : interpolated value  */
     Word16 i, k, sum;
     Word32 L_sum;
 
-    test();
+    
     if (frac < 0)
     {
         frac = add(frac, UP_SAMP);
         x--;
-        move16();
+        
     }
     x = x - L_INTERPOL1 + 1;
-    move16();
+    
 
-    L_sum = 0L;                            move32();
+    L_sum = 0L;                            
     for (i = 0, k = sub(sub(UP_SAMP, 1), frac); i < 2 * L_INTERPOL1; i++, k += UP_SAMP)
     {
         L_sum = L_mac(L_sum, x[i], inter4_1[k]);

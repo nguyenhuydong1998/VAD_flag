@@ -49,16 +49,16 @@ void DEC_ACELP_4t64_fx(
 
     for (i = 0; i < L_CODE; i++)
     {
-        code[i] = 0;                       move16();
+        code[i] = 0;                       
     }
 
     /* decode the positions and signs of pulses and build the codeword */
-    test();test();test();test();test();test();test();
+    
     if (sub(nbbits, 20) == 0)
     {
         for (k = 0; k < NB_TRACK; k++)
         {
-            L_index = index[k];            move32();
+            L_index = index[k];            
             dec_1p_N1(L_index, 4, 0, pos);
             add_pulses(pos, 1, k, code);
         }
@@ -66,7 +66,7 @@ void DEC_ACELP_4t64_fx(
     {
         for (k = 0; k < NB_TRACK; k++)
         {
-            L_index = index[k];            move32();
+            L_index = index[k];            
             dec_2p_2N1(L_index, 4, 0, pos);
             add_pulses(pos, 2, k, code);
         }
@@ -74,13 +74,13 @@ void DEC_ACELP_4t64_fx(
     {
         for (k = 0; k < NB_TRACK - 2; k++)
         {
-            L_index = index[k];            move32();
+            L_index = index[k];            
             dec_3p_3N1(L_index, 4, 0, pos);
             add_pulses(pos, 3, k, code);
         }
         for (k = 2; k < NB_TRACK; k++)
         {
-            L_index = index[k];            move32();
+            L_index = index[k];            
             dec_2p_2N1(L_index, 4, 0, pos);
             add_pulses(pos, 2, k, code);
         }
@@ -88,7 +88,7 @@ void DEC_ACELP_4t64_fx(
     {
         for (k = 0; k < NB_TRACK; k++)
         {
-            L_index = index[k];            move32();
+            L_index = index[k];            
             dec_3p_3N1(L_index, 4, 0, pos);
             add_pulses(pos, 3, k, code);
         }
@@ -135,8 +135,8 @@ static void add_pulses(Word16 pos[], Word16 nb_pulse, Word16 track, Word16 code[
     for (k = 0; k < nb_pulse; k++)
     {
         /* i = ((pos[k] & (NB_POS-1))*NB_TRACK) + track; */
-        i = (Word16) (add(shl((Word16) (pos[k] & (NB_POS - 1)), 2), track));    logic16();
-        test();logic16();
+        i = (Word16) (add(shl((Word16) (pos[k] & (NB_POS - 1)), 2), track));    
+        
         if ((pos[k] & NB_POS) == 0)
             code[i] = add(code[i], 512);
         else

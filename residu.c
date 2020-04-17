@@ -28,7 +28,7 @@ void Residu(
             s = L_mac(s, a[j], x[i - j]);
 
         s = L_shl(s, 3 + 1);               /* saturation can occur here */
-        y[i] = round(s);                   move16();
+        y[i] = round(s);                   
     }
 
     return;

@@ -28,7 +28,7 @@ Word32 quant_1p_N1(                        /* (o) return N+1 bits             */
      * Quantization of 1 pulse with N+1 bits:                *
      *-------------------------------------------------------*/
     index = L_deposit_l((Word16) (pos & mask));
-    test();
+    
     if ((pos & NB_POS) != 0)
     {
         index = L_add(index, L_deposit_l(shl(1, N)));   /* index += 1 << N; */
@@ -47,12 +47,12 @@ void dec_1p_N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
      *-------------------------------------------------------*/
     pos1 = add(extract_l(index & mask), offset);        /* pos1 = ((index & mask) + offset); */
     i = (L_shr(index, N) & 1L);              /* i = ((index >> N) & 1); */
-    test();
+    
     if (L_sub(i, 1) == 0)
     {
         pos1 = add(pos1, NB_POS);
     }
-    pos[0] = pos1;                         move16();
+    pos[0] = pos1;                         
 
     return;
 }
@@ -70,11 +70,11 @@ Word32 quant_2p_2N1(                       /* (o) return (2*N)+1 bits         */
     /*-------------------------------------------------------*
      * Quantization of 2 pulses with 2*N+1 bits:             *
      *-------------------------------------------------------*/
-    test();logic16();logic16();
+    
     if (((pos2 ^ pos1) & NB_POS) == 0)
     {
         /* sign of 1st pulse == sign of 2th pulse */
-        test();
+        
         if (sub(pos1, pos2) <= 0)          /* ((pos1 - pos2) <= 0) */
         {
             /* index = ((pos1 & mask) << N) + (pos2 & mask); */
@@ -84,7 +84,7 @@ Word32 quant_2p_2N1(                       /* (o) return (2*N)+1 bits         */
             /* ((pos2 & mask) << N) + (pos1 & mask); */
             index = L_deposit_l(add(shl(((Word16) (pos2 & mask)), N), ((Word16) (pos1 & mask))));
         }
-        test();logic16();
+        
         if ((pos1 & NB_POS) != 0)
         {
             tmp = shl(N, 1);
@@ -93,12 +93,12 @@ Word32 quant_2p_2N1(                       /* (o) return (2*N)+1 bits         */
     } else
     {
         /* sign of 1st pulse != sign of 2th pulse */
-        test();logic16();logic16();
+        
         if (sub((Word16) (pos1 & mask), (Word16) (pos2 & mask)) <= 0)
         {
             /* index = ((pos2 & mask) << N) + (pos1 & mask); */
-            index = L_deposit_l(add(shl(((Word16) (pos2 & mask)), N), ((Word16) (pos1 & mask))));       logic16();logic16();
-            test();logic16();
+            index = L_deposit_l(add(shl(((Word16) (pos2 & mask)), N), ((Word16) (pos1 & mask))));       
+            
             if ((pos2 & NB_POS) != 0)
             {
                 tmp = shl(N, 1);           /* index += 1 << (2*N); */
@@ -107,8 +107,8 @@ Word32 quant_2p_2N1(                       /* (o) return (2*N)+1 bits         */
         } else
         {
             /* index = ((pos1 & mask) << N) + (pos2 & mask);	 */
-            index = L_deposit_l(add(shl(((Word16) (pos1 & mask)), N), ((Word16) (pos2 & mask))));       logic16();logic16();
-            test();logic16();
+            index = L_deposit_l(add(shl(((Word16) (pos1 & mask)), N), ((Word16) (pos2 & mask))));       
+            
             if ((pos1 & NB_POS) != 0)
             {
                 tmp = shl(N, 1);
@@ -129,14 +129,14 @@ void dec_2p_2N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
      * Decode 2 pulses with 2*N+1 bits:                      *
      *-------------------------------------------------------*/
     /* pos1 = (((index >> N) & mask) + offset); */
-    pos1 = extract_l(L_add((L_shr(index, N) & mask), L_deposit_l(offset)));     logic16();
+    pos1 = extract_l(L_add((L_shr(index, N) & mask), L_deposit_l(offset)));     
     tmp = shl(N, 1);
-    i = (L_shr(index, tmp) & 1L);          logic16();/* i = (index >> (2*N)) & 1; */
-    pos2 = add(extract_l(index & mask), offset);        logic16();/* pos2 = ((index & mask) + offset); */
-    test();
+    i = (L_shr(index, tmp) & 1L);          /* i = (index >> (2*N)) & 1; */
+    pos2 = add(extract_l(index & mask), offset);        /* pos2 = ((index & mask) + offset); */
+    
     if (sub(pos2, pos1) < 0)               /* ((pos2 - pos1) < 0) */
     {
-        test();
+        
         if (L_sub(i, 1L) == 0)
         {                                  /* (i == 1) */
             pos1 = add(pos1, NB_POS);      /* pos1 += NB_POS; */
@@ -146,7 +146,7 @@ void dec_2p_2N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
         }
     } else
     {
-        test();
+        
         if (L_sub(i, 1L) == 0)
         {                                  /* (i == 1) */
             pos1 = add(pos1, NB_POS);      /* pos1 += NB_POS; */
@@ -154,8 +154,8 @@ void dec_2p_2N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
         }
     }
 
-    pos[0] = pos1;                         move16();
-    pos[1] = pos2;                         move16();
+    pos[0] = pos1;                         
+    pos[1] = pos2;                         
 
     return;
 }
@@ -174,19 +174,19 @@ Word32 quant_3p_3N1(                       /* (o) return (3*N)+1 bits         */
     /*-------------------------------------------------------*
      * Quantization of 3 pulses with 3*N+1 bits:             *
      *-------------------------------------------------------*/
-    test();test();logic16();logic16();logic16();logic16();
+    
     if (((pos1 ^ pos2) & nb_pos) == 0)
     {
         index = quant_2p_2N1(pos1, pos2, sub(N, 1));    /* index = quant_2p_2N1(pos1, pos2, (N-1)); */
         /* index += (pos1 & nb_pos) << N; */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  
         /* index += quant_1p_N1(pos3, N) << (2*N); */
         index = L_add(index, L_shl(quant_1p_N1(pos3, N), shl(N, 1)));
 
     } else if (((pos1 ^ pos3) & nb_pos) == 0)
     {
         index = quant_2p_2N1(pos1, pos3, sub(N, 1));    /* index = quant_2p_2N1(pos1, pos3, (N-1)); */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  
         /* index += (pos1 & nb_pos) << N; */
         index = L_add(index, L_shl(quant_1p_N1(pos2, N), shl(N, 1)));
         /* index += quant_1p_N1(pos2, N) <<
@@ -195,7 +195,7 @@ Word32 quant_3p_3N1(                       /* (o) return (3*N)+1 bits         */
     {
         index = quant_2p_2N1(pos2, pos3, sub(N, 1));    /* index = quant_2p_2N1(pos2, pos3, (N-1)); */
         /* index += (pos2 & nb_pos) << N;			 */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos2 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos2 & nb_pos)), N));  
         /* index += quant_1p_N1(pos1, N) << (2*N);	 */
         index = L_add(index, L_shl(quant_1p_N1(pos1, N), shl(N, 1)));
     }
@@ -213,11 +213,11 @@ void dec_3p_3N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
     tmp = sub(shl(N, 1), 1);               /* mask = ((1<<((2*N)-1))-1); */
     mask = L_sub(L_shl(1L, tmp), 1L);
 
-    idx = index & mask;                    logic16();
+    idx = index & mask;                    
     j = offset;
     tmp = sub(shl(N, 1), 1);
 
-    test();logic16();
+    
     if ((L_shr(index, tmp) & 1L) != 0L)
     {                                      /* if (((index >> ((2*N)-1)) & 1) == 1){ */
         j = add(j, shl(1, sub(N, 1)));     /* j += (1<<(N-1)); */
@@ -226,9 +226,9 @@ void dec_3p_3N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
 
     mask = sub(shl(1, add(N, 1)), 1);      /* mask = ((1<<(N+1))-1); */
     tmp = shl(N, 1);                       /* idx = (index >> (2*N)) & mask; */
-    idx = L_shr(index, tmp) & mask;        logic16();
+    idx = L_shr(index, tmp) & mask;        
 
-    dec_1p_N1(idx, N, offset, pos + 2);    move16();
+    dec_1p_N1(idx, N, offset, pos + 2);    
 
     return;
 }
@@ -248,26 +248,26 @@ Word32 quant_4p_4N1(                       /* (o) return (4*N)+1 bits         */
     /*-------------------------------------------------------*
      * Quantization of 4 pulses with 4*N+1 bits:             *
      *-------------------------------------------------------*/
-    test();test();logic16();logic16();logic16();logic16();
+    
     if (((pos1 ^ pos2) & nb_pos) == 0)
     {
         index = quant_2p_2N1(pos1, pos2, sub(N, 1));    /* index = quant_2p_2N1(pos1, pos2, (N-1)); */
         /* index += (pos1 & nb_pos) << N;	 */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  
         /* index += quant_2p_2N1(pos3, pos4, N) << (2*N); */
         index = L_add(index, L_shl(quant_2p_2N1(pos3, pos4, N), shl(N, 1)));
     } else if (((pos1 ^ pos3) & nb_pos) == 0)
     {
         index = quant_2p_2N1(pos1, pos3, sub(N, 1));
         /* index += (pos1 & nb_pos) << N; */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos1 & nb_pos)), N));  
         /* index += quant_2p_2N1(pos2, pos4, N) << (2*N); */
         index = L_add(index, L_shl(quant_2p_2N1(pos2, pos4, N), shl(N, 1)));
     } else
     {
         index = quant_2p_2N1(pos2, pos3, sub(N, 1));
         /* index += (pos2 & nb_pos) << N; */
-        index = L_add(index, L_shl(L_deposit_l((Word16) (pos2 & nb_pos)), N));  logic16();
+        index = L_add(index, L_shl(L_deposit_l((Word16) (pos2 & nb_pos)), N));  
         /* index += quant_2p_2N1(pos1, pos4, N) << (2*N); */
         index = L_add(index, L_shl(quant_2p_2N1(pos1, pos4, N), shl(N, 1)));
     }
@@ -284,11 +284,11 @@ void dec_4p_4N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
      *-------------------------------------------------------*/
     tmp = sub(shl(N, 1), 1);               /* mask = ((1<<((2*N)-1))-1); */
     mask = L_sub(L_shl(1L, tmp), 1L);
-    idx = index & mask;                    logic16();
-    j = offset;                            move16();
+    idx = index & mask;                    
+    j = offset;                            
     tmp = sub(shl(N, 1), 1);
 
-    test();logic16();
+    
     if ((L_shr(index, tmp) & 1L) != 0L)
     {                                      /* (((index >> ((2*N)-1)) & 1) == 1) */
         j = add(j, shl(1, sub(N, 1)));     /* j += (1<<(N-1)); */
@@ -298,8 +298,8 @@ void dec_4p_4N1(Word32 index, Word16 N, Word16 offset, Word16 pos[])
 
     tmp = add(shl(N, 1), 1);               /* mask = ((1<<((2*N)+1))-1); */
     mask = L_sub(L_shl(1L, tmp), 1L);
-    idx = L_shr(index, shl(N, 1)) & mask;  logic16();/* idx = (index >> (2*N)) & mask; */
-    dec_2p_2N1(idx, N, offset, pos + 2);   move16();  /* dec_2p_2N1(idx, N, offset, pos+2); */
+    idx = L_shr(index, shl(N, 1)) & mask;  /* idx = (index >> (2*N)) & mask; */
+    dec_2p_2N1(idx, N, offset, pos + 2);     /* dec_2p_2N1(idx, N, offset, pos+2); */
 
     return;
 }
@@ -313,21 +313,21 @@ Word32 quant_4p_4N(                        /* (o) return 4*N bits             */
     Word16 posA[4], posB[4];
     Word32 index;
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     nb_pos = shl(1, n_1);                  /* nb_pos = (1<<n_1); */
     mask = sub(shl(1, N), 1);              /* mask = ((1<<N)-1); */
 
-    i = 0;                                 move16();
-    j = 0;                                 move16();
+    i = 0;                                 
+    j = 0;                                 
     for (k = 0; k < 4; k++)
     {
-        test();logic16();
+        
         if ((pos[k] & nb_pos) == 0)
         {
-            posA[i++] = pos[k];            move16();
+            posA[i++] = pos[k];            
         } else
         {
-            posB[j++] = pos[k];            move16();
+            posB[j++] = pos[k];            
         }
     }
 
@@ -365,7 +365,7 @@ Word32 quant_4p_4N(                        /* (o) return 4*N bits             */
         fprintf(stderr, "Error in function quant_4p_4N\n");
     }
     tmp = sub(shl(N, 2), 2);               /* index += (i & 3) << ((4*N)-2); */
-    index = L_add(index, L_shl((L_deposit_l(i) & (3L)), tmp));  logic16();
+    index = L_add(index, L_shl((L_deposit_l(i) & (3L)), tmp));  
 
     return (index);
 }
@@ -378,17 +378,17 @@ void dec_4p_4N(Word32 index, Word16 N, Word16 offset, Word16 pos[])
      * Decode 4 pulses with 4*N bits:                        *
      *-------------------------------------------------------*/
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     j = add(offset, shl(1, n_1));          /* j = offset + (1 << n_1); */
 
     tmp = sub(shl(N, 2), 2);
-    test();logic16();
+    
     switch (L_shr(index, tmp) & 3)
     {                                      /* ((index >> ((4*N)-2)) & 3) */
     case 0:
         tmp = add(shl(n_1, 2), 1);
 
-        test();logic16();
+        
         if ((L_shr(index, tmp) & 1) == 0)
         {                                  /* (((index >> ((4*n_1)+1)) & 1) == 0) */
             dec_4p_4N1(index, n_1, offset, pos);
@@ -400,17 +400,17 @@ void dec_4p_4N(Word32 index, Word16 N, Word16 offset, Word16 pos[])
     case 1:
         tmp = add(extract_l(L_shr(L_mult(3, n_1), 1)), 1); /* dec_1p_N1((index>>((3*n_1)+1)), n_1, offset, pos) */
         dec_1p_N1(L_shr(index, tmp), n_1, offset, pos);
-        dec_3p_3N1(index, n_1, j, pos + 1);move16();
+        dec_3p_3N1(index, n_1, j, pos + 1);
         break;
     case 2:
         tmp = add(shl(n_1, 1), 1);         /* dec_2p_2N1((index>>((2*n_1)+1)), n_1, offset, pos); */
         dec_2p_2N1(L_shr(index, tmp), n_1, offset, pos);
-        dec_2p_2N1(index, n_1, j, pos + 2);move16();
+        dec_2p_2N1(index, n_1, j, pos + 2);
         break;
     case 3:
         tmp = add(n_1, 1);                 /* dec_3p_3N1((index>>(n_1+1)), n_1, offset, pos); */
         dec_3p_3N1(L_shr(index, tmp), n_1, offset, pos);
-        dec_1p_N1(index, n_1, j, pos + 3); move16();
+        dec_1p_N1(index, n_1, j, pos + 3); 
         break;
     }
     return;
@@ -425,20 +425,20 @@ Word32 quant_5p_5N(                        /* (o) return 5*N bits             */
     Word16 posA[5], posB[5];
     Word32 index, tmp2;
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     nb_pos = shl(1, n_1);                  /* nb_pos = (1<<n_1); */
 
-    i = 0;                                 move16();
-    j = 0;                                 move16();
+    i = 0;                                 
+    j = 0;                                 
     for (k = 0; k < 5; k++)
     {
-        test();logic16();
+        
         if ((pos[k] & nb_pos) == 0)
         {
-            posA[i++] = pos[k];            move16();
+            posA[i++] = pos[k];            
         } else
         {
-            posB[j++] = pos[k];            move16();
+            posB[j++] = pos[k];            
         }
     }
 
@@ -500,21 +500,21 @@ void dec_5p_5N(Word32 index, Word16 N, Word16 offset, Word16 pos[])
      * Decode 5 pulses with 5*N bits:                        *
      *-------------------------------------------------------*/
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     j = add(offset, shl(1, n_1));          /* j = offset + (1 << n_1); */
     tmp = add(shl(N, 1), 1);               /* idx = (index >> ((2*N)+1)); */
     idx = L_shr(index, tmp);
     tmp = sub(extract_l(L_shr(L_mult(5, N), 1)), 1);    /* ((5*N)-1)) */
 
-    test();logic16();
+    
     if ((L_shr(index, tmp) & 1) == 0)      /* ((index >> ((5*N)-1)) & 1)  */
     {
         dec_3p_3N1(idx, n_1, offset, pos);
-        dec_2p_2N1(index, N, offset, pos + 3);  move16();
+        dec_2p_2N1(index, N, offset, pos + 3);  
     } else
     {
         dec_3p_3N1(idx, n_1, j, pos);
-        dec_2p_2N1(index, N, offset, pos + 3);  move16();
+        dec_2p_2N1(index, N, offset, pos + 3);  
     }
     return;
 }
@@ -530,20 +530,20 @@ Word32 quant_6p_6N_2(                      /* (o) return (6*N)-2 bits         */
 
     /* !!  N and n_1 are constants -> it doesn't need to be operated by Basic Operators */
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     nb_pos = shl(1, n_1);                  /* nb_pos = (1<<n_1); */
 
-    i = 0;                                 move16();
-    j = 0;                                 move16();
+    i = 0;                                 
+    j = 0;                                 
     for (k = 0; k < 6; k++)
     {
-        test();logic16();
+        
         if ((pos[k] & nb_pos) == 0)
         {
-            posA[i++] = pos[k];            move16();
+            posA[i++] = pos[k];            
         } else
         {
-            posB[j++] = pos[k];            move16();
+            posB[j++] = pos[k];            
         }
     }
 
@@ -570,17 +570,17 @@ Word32 quant_6p_6N_2(                      /* (o) return (6*N)-2 bits         */
         index = L_add(index, quant_3p_3N1(posB[0], posB[1], posB[2], n_1));     /* index += quant_3p_3N1(posB[0], posB[1], posB[2], n_1); */
         break;
     case 4:
-        i = 2;                             move16();
+        i = 2;                             
         index = L_shl(quant_4p_4N(posA, n_1), (Word16) (2 * n_1 + 1));  /* index = quant_4p_4N(posA, n_1) << ((2*n_1)+1); */
         index = L_add(index, quant_2p_2N1(posB[0], posB[1], n_1));      /* index += quant_2p_2N1(posB[0], posB[1], n_1); */
         break;
     case 5:
-        i = 1;                             move16();
+        i = 1;                             
         index = L_shl(quant_5p_5N(posA, n_1), N);       /* index = quant_5p_5N(posA, n_1) << N; */
         index = L_add(index, quant_1p_N1(posB[0], n_1));        /* index += quant_1p_N1(posB[0], n_1); */
         break;
     case 6:
-        i = 0;                             move16();
+        i = 0;                             
         index = L_shl(quant_5p_5N(posA, n_1), N);       /* index = quant_5p_5N(posA, n_1) << N; */
         index = L_add(index, quant_1p_N1(posA[5], n_1));        /* index += quant_1p_N1(posA[5], n_1); */
         break;
@@ -588,7 +588,7 @@ Word32 quant_6p_6N_2(                      /* (o) return (6*N)-2 bits         */
         index = 0;
         fprintf(stderr, "Error in function quant_6p_6N_2\n");
     }
-    index = L_add(index, L_shl((L_deposit_l(i) & 3L), (Word16) (6 * N - 4)));   logic16();/* index += (i & 3) << ((6*N)-4); */
+    index = L_add(index, L_shl((L_deposit_l(i) & 3L), (Word16) (6 * N - 4)));   /* index += (i & 3) << ((6*N)-4); */
 
     return (index);
 }
@@ -597,40 +597,40 @@ void dec_6p_6N_2(Word32 index, Word16 N, Word16 offset, Word16 pos[])
 {
     Word16 j, n_1, offsetA, offsetB;
 
-    n_1 = (Word16) (N - 1);                move16();
+    n_1 = (Word16) (N - 1);                
     j = add(offset, shl(1, n_1));          /* j = offset + (1 << n_1); */
 
 
     /* !!  N and n_1 are constants -> it doesn't need to be operated by Basic Operators */
 
-    offsetA = offsetB = j;                 move16();move16();
-    test();logic16();
+    offsetA = offsetB = j;                 
+    
     if ((L_shr(index, (Word16) (6 * N - 5)) & 1L) == 0)
     {                                      /* if (((index >> ((6*N)-5)) & 1) == 0) */
-        offsetA = offset;                  move16();
+        offsetA = offset;                  
     } else
     {
-        offsetB = offset;                  move16();
+        offsetB = offset;                  
     }
 
-    test();logic16();
+    
     switch (L_shr(index, (Word16) (6 * N - 4)) & 3)
     {                                      /* (index >> ((6*N)-4)) & 3 */
     case 0:
         dec_5p_5N(L_shr(index, N), n_1, offsetA, pos);  /* dec_5p_5N(index>>N, n_1, offsetA, pos); */
-        dec_1p_N1(index, n_1, offsetA, pos + 5);        move16();
+        dec_1p_N1(index, n_1, offsetA, pos + 5);        
         break;
     case 1:
         dec_5p_5N(L_shr(index, N), n_1, offsetA, pos);  /* dec_5p_5N(index>>N, n_1, offsetA, pos); */
-        dec_1p_N1(index, n_1, offsetB, pos + 5);        move16();
+        dec_1p_N1(index, n_1, offsetB, pos + 5);        
         break;
     case 2:
         dec_4p_4N(L_shr(index, (Word16) (2 * n_1 + 1)), n_1, offsetA, pos); /* dec_4p_4N(index>>((2*n_1)+1 ), n_1, offsetA, pos); */
-        dec_2p_2N1(index, n_1, offsetB, pos + 4);       move16();
+        dec_2p_2N1(index, n_1, offsetB, pos + 4);       
         break;
     case 3:
         dec_3p_3N1(L_shr(index, (Word16) (3 * n_1 + 1)), n_1, offset, pos); /* dec_3p_3N1(index>>((3*n_1)+ 1), n_1, offset, pos); */
-        dec_3p_3N1(index, n_1, j, pos + 3);move16();
+        dec_3p_3N1(index, n_1, j, pos + 3);
         break;
     }
     return;

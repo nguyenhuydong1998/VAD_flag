@@ -18,14 +18,14 @@ void Weight_a(
 {
     Word16 i, fac;
 
-    ap[0] = a[0];                          move16();
-    fac = gamma;                           move16();
+    ap[0] = a[0];                          
+    fac = gamma;                           
     for (i = 1; i < m; i++)
     {
-        ap[i] = round(L_mult(a[i], fac));  move16();
+        ap[i] = round(L_mult(a[i], fac));  
         fac = round(L_mult(fac, gamma));
     }
-    ap[m] = round(L_mult(a[m], fac));      move16();
+    ap[m] = round(L_mult(a[m], fac));      
 
     return;
 }

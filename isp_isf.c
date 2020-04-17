@@ -23,17 +23,17 @@ void Isp_isf(
     Word16 i, ind;
     Word32 L_tmp;
 
-    ind = 127;                             move16();  /* beging at end of table -1 */
+    ind = 127;                               /* beging at end of table -1 */
 
     for (i = (Word16) (m - 1); i >= 0; i--)
     {
-        test();
+        
         if (sub(i, sub(m, 2)) >= 0)
         {                                  /* m-2 is a constant */
-            ind = 127;                     move16();  /* beging at end of table -1 */
+            ind = 127;                       /* beging at end of table -1 */
         }
         /* find value in table that is just greater than isp[i] */
-        test();
+        
         while (sub(table[ind], isp[i]) < 0)
             ind--;
 
@@ -41,11 +41,11 @@ void Isp_isf(
 
         L_tmp = L_mult(sub(isp[i], table[ind]), slope[ind]);
         isf[i] = round(L_shl(L_tmp, 4));   /* (isp[i]-table[ind])*slope[ind])>>11 */
-        move16();
-        isf[i] = add(isf[i], shl(ind, 7)); move16();
+        
+        isf[i] = add(isf[i], shl(ind, 7)); 
     }
 
-    isf[m - 1] = shr(isf[m - 1], 1);       move16();
+    isf[m - 1] = shr(isf[m - 1], 1);       
 
     return;
 }
@@ -62,19 +62,19 @@ void Isf_isp(
 
     for (i = 0; i < m - 1; i++)
     {
-        isp[i] = isf[i];                   move16();
+        isp[i] = isf[i];                   
     }
     isp[m - 1] = shl(isf[m - 1], 1);
 
     for (i = 0; i < m; i++)
     {
         ind = shr(isp[i], 7);              /* ind    = b7-b15 of isf[i] */
-        offset = (Word16) (isp[i] & 0x007f);    logic16();  /* offset = b0-b6  of isf[i] */
+        offset = (Word16) (isp[i] & 0x007f);      /* offset = b0-b6  of isf[i] */
 
         /* isp[i] = table[ind]+ ((table[ind+1]-table[ind])*offset) / 128 */
 
         L_tmp = L_mult(sub(table[ind + 1], table[ind]), offset);
-        isp[i] = add(table[ind], extract_l(L_shr(L_tmp, 8)));   move16();
+        isp[i] = add(table[ind], extract_l(L_shr(L_tmp, 8)));   
     }
 
     return;

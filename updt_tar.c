@@ -23,7 +23,7 @@ void Updt_tar(
     {
         L_tmp = L_mult(x[i], 16384);
         L_tmp = L_msu(L_tmp, y[i], gain);
-        x2[i] = extract_h(L_shl(L_tmp, 1));  move16();
+        x2[i] = extract_h(L_shl(L_tmp, 1));  
     }
 
     return;

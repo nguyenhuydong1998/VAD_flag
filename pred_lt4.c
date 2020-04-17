@@ -85,22 +85,22 @@ void Pred_lt4(
     Word32 L_sum;
 
     x = &exc[-T0];
-    move16();
+    
 
     frac = negate(frac);
-    test();
+    
     if (frac < 0)
     {
         frac = add(frac, UP_SAMP);
         x--;
-        move16();
+        
     }
     x = x - L_INTERPOL2 + 1;
-    move16();
+    
 
     for (j = 0; j < L_subfr; j++)
     {
-        L_sum = 0L;                        move32();
+        L_sum = 0L;                        
         for (i = 0, k = sub(sub(UP_SAMP, 1), frac); i < 2 * L_INTERPOL2; i++, k += UP_SAMP)
         {
             L_sum = L_mac(L_sum, x[i], inter4_2[k]);
@@ -108,7 +108,7 @@ void Pred_lt4(
         L_sum = L_shl(L_sum, 1);
 
         exc[j] = round(L_sum);
-        move16();
+        
         x++;
     }
 

@@ -34,8 +34,8 @@ void Init_gp_clip(
      Word16 mem[]                          /* (o) : memory of gain of pitch clipping algorithm */
 )
 {
-    mem[0] = DIST_ISF_MAX;                 move16();
-    mem[1] = GAIN_PIT_MIN;                 move16();
+    mem[0] = DIST_ISF_MAX;                 
+    mem[1] = GAIN_PIT_MIN;                 
 }
 
 
@@ -47,20 +47,20 @@ Word16 Gp_clip(
     Word16 clip;
     Word16 thres;
 
-    clip = 0;                              move16();  /* move16 */
-    test(); test();
+    clip = 0;                                /* move16 */
+     
     if( (ser_size == NBBITS_7k) || (ser_size == NBBITS_9k) )
 	{
 		/* clipping is activated when filtered pitch gain > threshold (0.94 to 1 in Q14) */
 		/* thres = 0.9f + (0.1f*mem[0]/DIST_ISF_MAX); */
 		thres = add(14746, mult(1638, extract_l(L_mult(mem[0], (Word16)(16384/DIST_ISF_MAX_IO)))));
 
-		test();
+		
 		if (sub(mem[1], thres) > 0)
-			clip = 1;                          move16();
+			clip = 1;                          
 	}
 	else if ((sub(mem[0], DIST_ISF_THRES) < 0) && (sub(mem[1], GAIN_PIT_THRES) > 0))
-        clip = 1;                          move16();
+        clip = 1;                          
 
 
     return (clip);
@@ -80,33 +80,33 @@ void Gp_clip_test_isf(
     for (i = 2; i < M - 1; i++)
     {
         dist = sub(isf[i], isf[i - 1]);
-        test();
+        
         if (sub(dist, dist_min) < 0)
         {
-            dist_min = dist;               move16();
+            dist_min = dist;               
         }
     }
 
     dist = extract_h(L_mac(L_mult(26214, mem[0]), 6554, dist_min));
 
-    test(); test();
+     
     if( (ser_size == NBBITS_7k) || (ser_size == NBBITS_9k) )
 	{
-		test();
+		
 		if (sub(dist, DIST_ISF_MAX_IO) > 0)
 		{
-			dist = DIST_ISF_MAX_IO;               move16();
+			dist = DIST_ISF_MAX_IO;               
 		}
 	}
 	else
 	{
-		test();
+		
 		if (sub(dist, DIST_ISF_MAX) > 0)
 		{
-			dist = DIST_ISF_MAX;               move16();
+			dist = DIST_ISF_MAX;               
 		}
 	}
-    mem[0] = dist;                         move16();
+    mem[0] = dist;                         
 
     return;
 }
@@ -121,7 +121,7 @@ void Gp_clip_test_gain_pit(
     Word16 gain;
     Word32 L_tmp;
 
-    test(); test();
+     
     if( (ser_size == NBBITS_7k) || (ser_size == NBBITS_9k) )
 	{
 		/* long term LTP gain average (>250ms) */
@@ -136,12 +136,12 @@ void Gp_clip_test_gain_pit(
 	}
     gain = extract_h(L_tmp);
 
-    test();
+    
     if (sub(gain, GAIN_PIT_MIN) < 0)
     {
-        gain = GAIN_PIT_MIN;               move16();
+        gain = GAIN_PIT_MIN;               
     }
-    mem[1] = gain;                         move16();
+    mem[1] = gain;                         
 
     return;
 }

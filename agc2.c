@@ -37,7 +37,7 @@ void agc2(
         s = L_mac(s, temp, temp);
     }
 
-    test();
+    
     if (s == 0)
     {
         return;
@@ -55,11 +55,11 @@ void agc2(
         s = L_mac(s, temp, temp);
     }
 
-    test();
+    
     if (s == 0)
     {
         g0 = 0;
-        move16();
+        
     } else
     {
         i = norm_l(s);
@@ -82,7 +82,7 @@ void agc2(
     for (i = 0; i < l_trm; i++)
     {
         sig_out[i] = extract_h(L_shl(L_mult(sig_out[i], g0), 2));
-        move16();
+        
     }
 
     return;

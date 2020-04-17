@@ -179,13 +179,13 @@ static void Down_samp(
 {
     Word16 i, j, frac, pos;
 
-    pos = 0;                               move16();  /* position is in Q2 -> 1/4 resolution  */
+    pos = 0;                                 /* position is in Q2 -> 1/4 resolution  */
     for (j = 0; j < L_frame_d; j++)
     {
         i = shr(pos, 2);                   /* integer part     */
-        frac = (Word16) (pos & 3);         logic16();  /* fractional part */
+        frac = (Word16) (pos & 3);           /* fractional part */
 
-        sig_d[j] = Interpol(&sig[i], fir_down, frac, FAC4, NB_COEF_DOWN);       move16();
+        sig_d[j] = Interpol(&sig[i], fir_down, frac, FAC4, NB_COEF_DOWN);       
 
         pos = add(pos, FAC5);              /* pos + 5/4 */
     }
@@ -202,14 +202,14 @@ static void Up_samp(
 {
     Word16 i, j, pos, frac;
 
-    pos = 0;                               move16();  /* position with 1/5 resolution */
+    pos = 0;                                 /* position with 1/5 resolution */
 
     for (j = 0; j < L_frame; j++)
     {
         i = mult(pos, INV_FAC5);           /* integer part = pos * 1/5 */
         frac = sub(pos, add(shl(i, 2), i));/* frac = pos - (pos/5)*5   */
 
-        sig_u[j] = Interpol(&sig_d[i], fir_up, frac, FAC5, NB_COEF_UP); move16();
+        sig_u[j] = Interpol(&sig_d[i], fir_up, frac, FAC5, NB_COEF_UP); 
 
         pos = add(pos, FAC4);              /* position + 4/5 */
     }
@@ -230,9 +230,9 @@ static Word16 Interpol(                    /* return result of interpolation */
     Word16 i, k;
     Word32 L_sum;
 
-    x = x - nb_coef + 1;                   move16();
+    x = x - nb_coef + 1;                   
 
-    L_sum = 0L;                            move32();
+    L_sum = 0L;                            
     for (i = 0, k = sub(sub(resol, 1), frac); i < 2 * nb_coef; i++, k = (Word16) (k + resol))
     {
         L_sum = L_mac(L_sum, x[i], fir[k]);

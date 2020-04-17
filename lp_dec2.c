@@ -29,29 +29,29 @@ void LP_Decim2(
 
     /* copy initial filter states into buffer */
 
-    p_x = x_buf;                           move16();
+    p_x = x_buf;                           
     for (i = 0; i < L_MEM; i++)
     {
-        *p_x++ = mem[i];                   move16();
+        *p_x++ = mem[i];                   
     }
     for (i = 0; i < l; i++)
     {
-        *p_x++ = x[i];                     move16();
+        *p_x++ = x[i];                     
     }
     for (i = 0; i < L_MEM; i++)
     {
-        mem[i] = x[l - L_MEM + i];         move16();
+        mem[i] = x[l - L_MEM + i];         
     }
 
     for (i = 0, j = 0; i < l; i += 2, j++)
     {
-        p_x = &x_buf[i];                   move16();
+        p_x = &x_buf[i];                   
 
-        L_tmp = 0L;                        move32();
+        L_tmp = 0L;                        
         for (k = 0; k < L_FIR; k++)
             L_tmp = L_mac(L_tmp, *p_x++, h_fir[k]);
 
-        x[j] = round(L_tmp);               move16();
+        x[j] = round(L_tmp);               
     }
 
     return;

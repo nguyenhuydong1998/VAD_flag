@@ -26,14 +26,14 @@ void Int_isp(
 
     for (k = 0; k < 3; k++)
     {
-        fac_new = frac[k];                 move16();
+        fac_new = frac[k];                 
         fac_old = add(sub(32767, fac_new), 1);  /* 1.0 - fac_new */
 
         for (i = 0; i < M; i++)
         {
             L_tmp = L_mult(isp_old[i], fac_old);
             L_tmp = L_mac(L_tmp, isp_new[i], fac_new);
-            isp[i] = round(L_tmp);         move16();
+            isp[i] = round(L_tmp);         
         }
         Isp_Az(isp, Az, M, 0);
         Az += MP1;

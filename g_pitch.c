@@ -30,13 +30,13 @@ Word16 G_pitch(                            /* (o) Q14 : Gain of pitch lag satura
 
     xy = extract_h(Dot_product12(xn, y1, L_subfr, &exp_xy));
 
-    g_coeff[0] = yy;                       move16();
-    g_coeff[1] = exp_yy;                   move16();
-    g_coeff[2] = xy;                       move16();
-    g_coeff[3] = exp_xy;                   move16();
+    g_coeff[0] = yy;                       
+    g_coeff[1] = exp_yy;                   
+    g_coeff[2] = xy;                       
+    g_coeff[3] = exp_xy;                   
 
     /* If (xy < 0) gain = 0 */
-    test();
+    
     if (xy < 0)
         return ((Word16) 0);
 
@@ -51,10 +51,10 @@ Word16 G_pitch(                            /* (o) Q14 : Gain of pitch lag satura
     gain = shl(gain, i);                   /* saturation can occur here */
 
     /* if (gain > 1.2) gain = 1.2  in Q14 */
-    test();
+    
     if (sub(gain, 19661) > 0)
     {
-        gain = 19661;                      move16();
+        gain = 19661;                      
     }
     return (gain);
 }

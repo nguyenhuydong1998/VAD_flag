@@ -28,7 +28,7 @@ void Autocorr(
 
     for (i = 0; i < L_WINDOW; i++)
     {
-        y[i] = mult_r(x[i], window[i]);    move16();
+        y[i] = mult_r(x[i], window[i]);    
     }
 
     /* calculate energy of signal */
@@ -45,19 +45,19 @@ void Autocorr(
 
     norm = norm_l(L_sum);
     shift = sub(4, shr(norm, 1));
-    test();
+    
     if (shift < 0)
     {
-        shift = 0;                         move16();
+        shift = 0;                         
     }
     for (i = 0; i < L_WINDOW; i++)
     {
-        y[i] = shr_r(y[i], shift);         move16();
+        y[i] = shr_r(y[i], shift);         
     }
 
     /* Compute and normalize r[0] */
 
-    L_sum = 1;                             move32();
+    L_sum = 1;                             
     for (i = 0; i < L_WINDOW; i++)
         L_sum = L_mac(L_sum, y[i], y[i]);
 
@@ -69,7 +69,7 @@ void Autocorr(
 
     for (i = 1; i <= m; i++)
     {
-        L_sum = 0;                         move32();
+        L_sum = 0;                         
         for (j = 0; j < L_WINDOW - i; j++)
             L_sum = L_mac(L_sum, y[j], y[j + i]);
 

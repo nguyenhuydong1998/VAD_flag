@@ -27,23 +27,23 @@ void cor_h_x(
 
     /* first keep the result on 32 bits and find absolute maximum */
 
-    L_tot = 1L;                            move32();
+    L_tot = 1L;                            
 
     for (k = 0; k < NB_TRACK; k++)
     {
-        L_max = 0;                         move32();
+        L_max = 0;                         
         for (i = k; i < L_SUBFR; i += STEP)
         {
-            L_tmp = 1L;                    move32();  /* 1 -> to avoid null dn[] */
+            L_tmp = 1L;                      /* 1 -> to avoid null dn[] */
             for (j = i; j < L_SUBFR; j++)
                 L_tmp = L_mac(L_tmp, x[j], h[j - i]);
 
-            y32[i] = L_tmp;                move32();
+            y32[i] = L_tmp;                
             L_tmp = L_abs(L_tmp);
-            test();
+            
             if (L_sub(L_tmp, L_max) > (Word32) 0)
             {
-                L_max = L_tmp;             move32();
+                L_max = L_tmp;             
             }
         }
         /* tot += 3*max / 8 */
@@ -59,7 +59,7 @@ void cor_h_x(
 
     for (i = 0; i < L_SUBFR; i++)
     {
-        dn[i] = round(L_shl(y32[i], j));   move16();
+        dn[i] = round(L_shl(y32[i], j));   
     }
 
     return;

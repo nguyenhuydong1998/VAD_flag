@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
         for (i = 0; i < L_FRAME16k; i++)   /* Delete the 2 LSBs (14-bit output) */
         {
-            synth[i] = (Word16) (synth[i] & 0xfffC);      logic16(); move16();
+            synth[i] = (Word16) (synth[i] & 0xfffC);       
         }
 
         fwrite(synth, sizeof(Word16), L_FRAME16k, f_synth);

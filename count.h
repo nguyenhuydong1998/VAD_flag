@@ -153,7 +153,7 @@ int main(){
  init_che(...); 
  ... 
  while(data){ 
-    test();             // Note this call to test();
+                 // Note this call to 
     if(useSpe1)
         setCounter(spe1Id); 
     else 

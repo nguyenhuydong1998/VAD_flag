@@ -94,30 +94,30 @@ void Isqrt_n(
 {
     Word16 i, a, tmp;
 
-    test();
+    
     if (*frac <= (Word32) 0)
     {
-        *exp = 0;                          move16();
-        *frac = 0x7fffffffL;               move32();
+        *exp = 0;                          
+        *frac = 0x7fffffffL;               
         return;
     }
-    test();logic16();
+    
     if (sub((Word16) (*exp & 1), 1) == 0)  /* If exponant odd -> shift right */
         *frac = L_shr(*frac, 1);
 
-    *exp = negate(shr(sub(*exp, 1), 1));   move16();
+    *exp = negate(shr(sub(*exp, 1), 1));   
 
-    *frac = L_shr(*frac, 9);               move32();
+    *frac = L_shr(*frac, 9);               
     i = extract_h(*frac);                  /* Extract b25-b31 */
-    *frac = L_shr(*frac, 1);               move32();
+    *frac = L_shr(*frac, 1);               
     a = extract_l(*frac);                  /* Extract b10-b24 */
-    a = (Word16) (a & (Word16) 0x7fff);    logic16();
+    a = (Word16) (a & (Word16) 0x7fff);    
 
     i = sub(i, 16);
-    move32();
+    
     *frac = L_deposit_h(table_isqrt[i]);   /* table[i] << 16         */
     tmp = sub(table_isqrt[i], table_isqrt[i + 1]);      /* table[i] - table[i+1]) */
-    move32();
+    
     *frac = L_msu(*frac, tmp, a);          /* frac -=  tmp*a*2       */
 
     return;
@@ -161,7 +161,7 @@ Word32 Pow2(                               /* (o) Q0  : result       (range: 0<=
     i = extract_h(L_x);                    /* Extract b10-b16 of fraction */
     L_x = L_shr(L_x, 1);
     a = extract_l(L_x);                    /* Extract b0-b9   of fraction */
-    a = (Word16) (a & (Word16) 0x7fff);    logic16();
+    a = (Word16) (a & (Word16) 0x7fff);    
 
     L_x = L_deposit_h(table_pow2[i]);      /* table[i] << 16        */
     tmp = sub(table_pow2[i], table_pow2[i + 1]);        /* table[i] - table[i+1] */
@@ -197,7 +197,7 @@ Word32 Dot_product12(                      /* (o) Q31: normalized result (1 < va
     Word16 i, sft;
     Word32 L_sum;
 
-    L_sum = 1L;                            move32();
+    L_sum = 1L;                            
     for (i = 0; i < lg; i++)
         L_sum = L_mac(L_sum, x[i], y[i]);
 
@@ -206,7 +206,7 @@ Word32 Dot_product12(                      /* (o) Q31: normalized result (1 < va
     sft = norm_l(L_sum);
     L_sum = L_shl(L_sum, sft);
 
-    *exp = sub(30, sft);                   move16();  /* exponent = 0..30 */
+    *exp = sub(30, sft);                     /* exponent = 0..30 */
 
     return (L_sum);
 }

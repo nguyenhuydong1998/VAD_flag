@@ -235,7 +235,7 @@ int main(int argc, char *argv[])
 
         for (i = 0; i < L_FRAME16k; i++)   /* Delete the 2 LSBs (14-bit input) */
         {
-            signal[i] = (Word16) (signal[i] & 0xfffC);      logic16(); move16();
+            signal[i] = (Word16) (signal[i] & 0xfffC);       
         }
 
         coder(signal, &nb_bits, st, &flag_VAD);

@@ -49,23 +49,23 @@ void HP50_12k8(
     Word16 y2_hi, y2_lo, y1_hi, y1_lo, x0, x1;
     Word32 L_tmp;
 
-    y2_hi = mem[0];                        move16();
-    y2_lo = mem[1];                        move16();
-    y1_hi = mem[2];                        move16();
-    y1_lo = mem[3];                        move16();
-    x0 = mem[4];                           move16();
-    x1 = mem[5];                           move16();
+    y2_hi = mem[0];                        
+    y2_lo = mem[1];                        
+    y1_hi = mem[2];                        
+    y1_lo = mem[3];                        
+    x0 = mem[4];                           
+    x1 = mem[5];                           
 
     for (i = 0; i < lg; i++)
     {
-        x2 = x1;                           move16();
-        x1 = x0;                           move16();
-        x0 = signal[i];                    move16();
+        x2 = x1;                           
+        x1 = x0;                           
+        x0 = signal[i];                    
 
         /* y[i] = b[0]*x[i] + b[1]*x[i-1] + b140[2]*x[i-2]  */
         /* + a[1]*y[i-1] + a[2] * y[i-2];  */
 
-        move32();
+        
         L_tmp = 16384L;                    /* rounding to maximise precision */
         L_tmp = L_mac(L_tmp, y1_lo, a[1]);
         L_tmp = L_mac(L_tmp, y2_lo, a[2]);
@@ -78,20 +78,20 @@ void HP50_12k8(
 
         L_tmp = L_shl(L_tmp, 2);           /* coeff Q12 --> Q14 */
 
-        y2_hi = y1_hi;                     move16();
-        y2_lo = y1_lo;                     move16();
+        y2_hi = y1_hi;                     
+        y2_lo = y1_lo;                     
         L_Extract(L_tmp, &y1_hi, &y1_lo);
 
         L_tmp = L_shl(L_tmp, 1);           /* coeff Q14 --> Q15 with saturation */
-        signal[i] = round(L_tmp);          move16();
+        signal[i] = round(L_tmp);          
     }
 
-    mem[0] = y2_hi;                        move16();
-    mem[1] = y2_lo;                        move16();
-    mem[2] = y1_hi;                        move16();
-    mem[3] = y1_lo;                        move16();
-    mem[4] = x0;                           move16();
-    mem[5] = x1;                           move16();
+    mem[0] = y2_hi;                        
+    mem[1] = y2_lo;                        
+    mem[2] = y1_hi;                        
+    mem[3] = y1_lo;                        
+    mem[4] = x0;                           
+    mem[5] = x1;                           
 
     return;
 }

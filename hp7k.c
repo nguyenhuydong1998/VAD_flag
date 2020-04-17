@@ -46,15 +46,15 @@ void Filt_7k(
 
     for (i = 0; i < lg; i++)
     {
-        x[i + L_FIR - 1] = signal[i];      move16();
+        x[i + L_FIR - 1] = signal[i];      
     }
 
     for (i = 0; i < lg; i++)
     {
-        L_tmp = 0;                         move32();
+        L_tmp = 0;                         
         for (j = 0; j < L_FIR; j++)
             L_tmp = L_mac(L_tmp, x[i + j], fir_7k[j]);
-        signal[i] = round(L_tmp);          move16();
+        signal[i] = round(L_tmp);          
     }
 
     Copy(x + lg, mem, L_FIR - 1);

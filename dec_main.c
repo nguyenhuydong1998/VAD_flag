@@ -81,7 +81,7 @@ void Init_decoder(void **spd_state)
      * Memory allocation for coder state.                                      *
      *-------------------------------------------------------------------------*/
 
-    test();
+    
     if ((st = (Decoder_State *) malloc(sizeof(Decoder_State))) == NULL)
     {
         printf("Can not malloc Decoder_State structure!\n");
@@ -108,20 +108,20 @@ void Reset_decoder(void *st, Word16 reset_all)
     Set_zero(dec_state->old_exc, PIT_MAX + L_INTERPOL);
     Set_zero(dec_state->past_isfq, M);
 
-    dec_state->old_T0_frac = 0;            move16();  /* old pitch value = 64.0 */
-    dec_state->old_T0 = 64;                move16();
-    dec_state->first_frame = 1;            move16();
-    dec_state->L_gc_thres = 0;             move16();
-    dec_state->tilt_code = 0;              move16();
+    dec_state->old_T0_frac = 0;              /* old pitch value = 64.0 */
+    dec_state->old_T0 = 64;                
+    dec_state->first_frame = 1;            
+    dec_state->L_gc_thres = 0;             
+    dec_state->tilt_code = 0;              
 
     Init_Phase_dispersion(dec_state->disp_mem);
 
     /* scaling memories for excitation */
-    dec_state->Q_old = Q_MAX;              move16();
-    dec_state->Qsubfr[3] = Q_MAX;          move16();
-    dec_state->Qsubfr[2] = Q_MAX;          move16();
-    dec_state->Qsubfr[1] = Q_MAX;          move16();
-    dec_state->Qsubfr[0] = Q_MAX;          move16();
+    dec_state->Q_old = Q_MAX;              
+    dec_state->Qsubfr[3] = Q_MAX;          
+    dec_state->Qsubfr[2] = Q_MAX;          
+    dec_state->Qsubfr[1] = Q_MAX;          
+    dec_state->Qsubfr[0] = Q_MAX;          
 
     if (reset_all != 0)
     {
@@ -143,14 +143,14 @@ void Reset_decoder(void *st, Word16 reset_all)
             Copy(isf_init, &dec_state->isf_buf[i * M], M);
         /* variable initialization */
 
-        dec_state->mem_deemph = 0;         move16();
+        dec_state->mem_deemph = 0;         
 
-        dec_state->seed = 21845;           move16();  /* init random with 21845 */
-        dec_state->seed2 = 21845;          move16();
-        dec_state->seed3 = 21845;          move16();
+        dec_state->seed = 21845;             /* init random with 21845 */
+        dec_state->seed2 = 21845;          
+        dec_state->seed3 = 21845;          
 
-        dec_state->state = 0;              move16();
-        dec_state->prev_bfi = 0;           move16();
+        dec_state->state = 0;              
+        dec_state->prev_bfi = 0;           
 
         /* Static vectors to zero */
 
@@ -159,7 +159,7 @@ void Reset_decoder(void *st, Word16 reset_all)
         Set_zero(dec_state->mem_syn_lo, M);
 
         dtx_dec_reset(dec_state->dtx_decSt, isf_init);
-        dec_state->vad_hist = 0;           move16();
+        dec_state->vad_hist = 0;           
 
     }
     return;
@@ -227,49 +227,49 @@ void decoder(
 
     /* mode verification */
 
-    nb_bits = nb_of_bits[mode];            move16();
+    nb_bits = nb_of_bits[mode];            
 
-    *frame_length = L_FRAME16k;            move16();
+    *frame_length = L_FRAME16k;            
 
     /* find the new  DTX state  SPEECH OR DTX */
     newDTXState = rx_dtx_handler(st->dtx_decSt, frame_type);
 
-    test();
+    
     if (sub(newDTXState, SPEECH) != 0)
     {
         dtx_dec(st->dtx_decSt, exc2, newDTXState, isf, &prms);
     }
     /* SPEECH action state machine  */
-    test();test();
+    
     if ((sub(frame_type, RX_SPEECH_BAD) == 0) ||
         (sub(frame_type, RX_SPEECH_PROBABLY_DEGRADED) == 0))
     {
         /* bfi only for lsf, gains and pitch period */
-        bfi = 1;                           move16();
-        unusable_frame = 0;                move16();
+        bfi = 1;                           
+        unusable_frame = 0;                
     } else if ((sub(frame_type, RX_NO_DATA) == 0) ||
     		   (sub(frame_type, RX_SPEECH_LOST) == 0))
     {
         /* bfi for all index, bits are not usable */
-        bfi = 1;                           move16();
-        unusable_frame = 1;                move16();
+        bfi = 1;                           
+        unusable_frame = 1;                
     } else
     {
-        bfi = 0;                           move16();
-        unusable_frame = 0;                move16();
+        bfi = 0;                           
+        unusable_frame = 0;                
     }
-    test();
+    
     if (bfi != 0)
     {
-        st->state = add(st->state, 1);     move16();
-        test();
+        st->state = add(st->state, 1);     
+        
         if (sub(st->state, 6) > 0)
         {
-            st->state = 6;                 move16();
+            st->state = 6;                 
         }
     } else
     {
-        st->state = shr(st->state, 1);     move16();
+        st->state = shr(st->state, 1);     
     }
 
     /* If this frame is the first speech frame after CNI period,     */
@@ -281,43 +281,43 @@ void decoder(
     /* keep the audible noise resulting from a SID frame which is    */
     /* erroneously interpreted as a good speech frame as small as    */
     /* possible (the decoder output in this case is quickly muted)   */
-    test();test();
+    
     if (sub(st->dtx_decSt->dtxGlobalState, DTX) == 0)
     {
-        st->state = 5;                     move16();
-        st->prev_bfi = 0;                  move16();
+        st->state = 5;                     
+        st->prev_bfi = 0;                  
     } else if (sub(st->dtx_decSt->dtxGlobalState, DTX_MUTE) == 0)
     {
-        st->state = 5;                     move16();
-        st->prev_bfi = 1;                  move16();
+        st->state = 5;                     
+        st->prev_bfi = 1;                  
     }
-	test();
+	
 	if (sub(newDTXState, SPEECH) == 0)
 	{
 		vad_flag = Serial_parm(1, &prms);
-		test();
+		
 		if (bfi == 0)
 		{
-			test();
+			
 			if (vad_flag == 0)
 			{
-				st->vad_hist = add(st->vad_hist, 1);    move16();
-				st->dtx_decSt->dtx_vad_hist = add(st->dtx_decSt->dtx_vad_hist, 1);    move16();
+				st->vad_hist = add(st->vad_hist, 1);    
+				st->dtx_decSt->dtx_vad_hist = add(st->dtx_decSt->dtx_vad_hist, 1);    
 			} else
 			{
-				st->vad_hist = 0;          move16();
-				st->dtx_decSt->dtx_vad_hist = 0;      move16();
+				st->vad_hist = 0;          
+				st->dtx_decSt->dtx_vad_hist = 0;      
 			}
 		}
 		else if (st->dtx_decSt->dtx_vad_hist > 0)
 		{
-			st->dtx_decSt->dtx_vad_hist = add(st->dtx_decSt->dtx_vad_hist, 1);    move16();
+			st->dtx_decSt->dtx_vad_hist = add(st->dtx_decSt->dtx_vad_hist, 1);    
 		}
 	}
     /*----------------------------------------------------------------------*
      *                              DTX-CNG                                 *
      *----------------------------------------------------------------------*/
-    test();
+    
     if (sub(newDTXState, SPEECH) != 0)     /* CNG mode */
     {
         /* increase slightly energy of noise below 200 Hz */
@@ -336,7 +336,7 @@ void decoder(
             {
                 L_tmp = L_mult(isf_tmp[i], sub(32767, interpol_frac[j]));
                 L_tmp = L_mac(L_tmp, isf[i], interpol_frac[j]);
-                HfIsf[i] = round(L_tmp);   move16();
+                HfIsf[i] = round(L_tmp);   
             }
             synthesis(Aq, &exc2[i_subfr], 0, &synth16k[i_subfr * 5 / 4], (short) 1, HfIsf, nb_bits, newDTXState, st, bfi);
         }
@@ -346,8 +346,8 @@ void decoder(
 
         Copy(isf, st->isfold, M);
 
-        st->prev_bfi = bfi;                move16();
-        st->dtx_decSt->dtxGlobalState = newDTXState;    move16();
+        st->prev_bfi = bfi;                
+        st->dtx_decSt->dtxGlobalState = newDTXState;    
 
         return;
     }
@@ -358,28 +358,28 @@ void decoder(
     /* copy coder memory state into working space (internal memory for DSP) */
 
     Copy(st->old_exc, old_exc, PIT_MAX + L_INTERPOL);
-    exc = old_exc + PIT_MAX + L_INTERPOL;  move16();
+    exc = old_exc + PIT_MAX + L_INTERPOL;  
 
     /* Decode the ISFs */
-    test();
+    
     if (sub(nb_bits, NBBITS_7k) <= 0)
     {
-        ind[0] = Serial_parm(8, &prms);    move16();
-        ind[1] = Serial_parm(8, &prms);    move16();
-        ind[2] = Serial_parm(7, &prms);    move16();
-        ind[3] = Serial_parm(7, &prms);    move16();
-        ind[4] = Serial_parm(6, &prms);    move16();
+        ind[0] = Serial_parm(8, &prms);    
+        ind[1] = Serial_parm(8, &prms);    
+        ind[2] = Serial_parm(7, &prms);    
+        ind[3] = Serial_parm(7, &prms);    
+        ind[4] = Serial_parm(6, &prms);    
 
         Dpisf_2s_36b(ind, isf, st->past_isfq, st->isfold, st->isf_buf, bfi, 1);
     } else
     {
-        ind[0] = Serial_parm(8, &prms);    move16();
-        ind[1] = Serial_parm(8, &prms);    move16();
-        ind[2] = Serial_parm(6, &prms);    move16();
-        ind[3] = Serial_parm(7, &prms);    move16();
-        ind[4] = Serial_parm(7, &prms);    move16();
-        ind[5] = Serial_parm(5, &prms);    move16();
-        ind[6] = Serial_parm(5, &prms);    move16();
+        ind[0] = Serial_parm(8, &prms);    
+        ind[1] = Serial_parm(8, &prms);    
+        ind[2] = Serial_parm(6, &prms);    
+        ind[3] = Serial_parm(7, &prms);    
+        ind[4] = Serial_parm(7, &prms);    
+        ind[5] = Serial_parm(5, &prms);    
+        ind[6] = Serial_parm(5, &prms);    
 
         Dpisf_2s_46b(ind, isf, st->past_isfq, st->isfold, st->isf_buf, bfi, 1);
     }
@@ -387,10 +387,10 @@ void decoder(
     /* Convert ISFs to the cosine domain */
 
     Isf_isp(isf, ispnew, M);
-    test();
+    
     if (st->first_frame != 0)
     {
-        st->first_frame = 0;               move16();
+        st->first_frame = 0;               
         Copy(ispnew, st->ispold, M);
     }
     /* Find the interpolated ISPs and convert to a[] for all subframes */
@@ -401,7 +401,7 @@ void decoder(
 
     /* Check stability on isf : distance between old isf and current isf */
 
-    L_tmp = 0;                             move32();
+    L_tmp = 0;                             
     for (i = 0; i < M - 1; i++)
     {
         tmp = sub(isf[i], st->isfold[i]);
@@ -412,10 +412,10 @@ void decoder(
 
     tmp = sub(20480, tmp);                 /* 1.25 - tmp */
     stab_fac = shl(tmp, 1);                /* Q14 -> Q15 with saturation */
-    test();
+    
     if (stab_fac < 0)
     {
-        stab_fac = 0;                      move16();
+        stab_fac = 0;                      
     }
     Copy(st->isfold, isf_tmp, M);
     Copy(isf, st->isfold, M);
@@ -432,30 +432,30 @@ void decoder(
      *     - find the excitation and compute synthesis speech                 *
      *------------------------------------------------------------------------*/
 
-    p_Aq = Aq;                             move16();  /* pointer to interpolated LPC parameters */
+    p_Aq = Aq;                               /* pointer to interpolated LPC parameters */
 
     for (i_subfr = 0; i_subfr < L_FRAME; i_subfr += L_SUBFR)
     {
-        pit_flag = i_subfr;                move16();
+        pit_flag = i_subfr;                
 
-        test();test();
+        
         if ((sub(i_subfr, 2 * L_SUBFR) == 0) && (sub(nb_bits, NBBITS_7k) > 0))
         {
-            pit_flag = 0;                  move16();
+            pit_flag = 0;                  
         }
         /*-------------------------------------------------*
          * - Decode pitch lag                              *
          * Lag indeces received also in case of BFI,       *
          * so that the parameter pointer stays in sync.    *
          *-------------------------------------------------*/
-        test();
+        
         if (pit_flag == 0)
         {
-            test();
+            
             if (sub(nb_bits, NBBITS_9k) <= 0)
             {
                 index = Serial_parm(8, &prms);
-                test();
+                
                 if (sub(index, (PIT_FR1_8b - PIT_MIN) * 2) < 0)
                 {
                     T0 = add(PIT_MIN, shr(index, 1));
@@ -464,12 +464,12 @@ void decoder(
                 } else
                 {
                     T0 = add(index, PIT_FR1_8b - ((PIT_FR1_8b - PIT_MIN) * 2));
-                    T0_frac = 0;           move16();
+                    T0_frac = 0;           
                 }
             } else
             {
                 index = Serial_parm(9, &prms);
-                test();test();
+                
                 if (sub(index, (PIT_FR2 - PIT_MIN) * 4) < 0)
                 {
                     T0 = add(PIT_MIN, shr(index, 2));
@@ -483,28 +483,28 @@ void decoder(
                 } else
                 {
                     T0 = add(index, (PIT_FR1_9b - ((PIT_FR2 - PIT_MIN) * 4) - ((PIT_FR1_9b - PIT_FR2) * 2)));
-                    T0_frac = 0;           move16();
+                    T0_frac = 0;           
                 }
             }
 
             /* find T0_min and T0_max for subframe 2 and 4 */
 
             T0_min = sub(T0, 8);
-            test();
+            
             if (sub(T0_min, PIT_MIN) < 0)
             {
-                T0_min = PIT_MIN;          move16();
+                T0_min = PIT_MIN;          
             }
             T0_max = add(T0_min, 15);
-            test();
+            
             if (sub(T0_max, PIT_MAX) > 0)
             {
-                T0_max = PIT_MAX;          move16();
+                T0_max = PIT_MAX;          
                 T0_min = sub(T0_max, 15);
             }
         } else
         {                                  /* if subframe 2 or 4 */
-            test();
+            
             if (sub(nb_bits, NBBITS_9k) <= 0)
             {
                 index = Serial_parm(5, &prms);
@@ -522,11 +522,11 @@ void decoder(
         }
 
         /* check BFI after pitch lag decoding */
-        test();
+        
         if (bfi != 0)                      /* if frame erasure */
         {
             lagconc(&(st->dec_gain[17]), st->lag_hist, &T0, &(st->old_T0), &(st->seed3), unusable_frame);
-            T0_frac = 0;                   move16();
+            T0_frac = 0;                   
         }
         /*-------------------------------------------------*
          * - Find the pitch gain, the interpolation filter *
@@ -535,23 +535,23 @@ void decoder(
 
         Pred_lt4(&exc[i_subfr], T0, T0_frac, L_SUBFR + 1);
 
-        test();
+        
         if (unusable_frame)
         {
-            select = 1;                    move16();
+            select = 1;                    
         } else
         {
-            test();
+            
             if (sub(nb_bits, NBBITS_9k) <= 0)
             {
-                select = 0;                move16();
+                select = 0;                
             } else
             {
                 select = Serial_parm(1, &prms);
             }
         }
 
-        test();
+        
         if (select == 0)
         {
             /* find pitch excitation with lp filter */
@@ -560,7 +560,7 @@ void decoder(
                 L_tmp = L_mult(5898, exc[i - 1 + i_subfr]);
                 L_tmp = L_mac(L_tmp, 20972, exc[i + i_subfr]);
                 L_tmp = L_mac(L_tmp, 5898, exc[i + 1 + i_subfr]);
-                code[i] = round(L_tmp);    move16();
+                code[i] = round(L_tmp);    
             }
             Copy(code, &exc[i_subfr], L_SUBFR);
         }
@@ -568,86 +568,86 @@ void decoder(
          * - Decode innovative codebook.                         *
          * - Add the fixed-gain pitch contribution to code[].    *
          *-------------------------------------------------------*/
-        test();test();test();test();test();test();test();test();
+        
         if (unusable_frame != 0)
         {
             /* the innovative code doesn't need to be scaled (see Q_gain2) */
             for (i = 0; i < L_SUBFR; i++)
             {
-                code[i] = shr(Random(&(st->seed)), 3);  move16();
+                code[i] = shr(Random(&(st->seed)), 3);  
             }
         } else if (sub(nb_bits, NBBITS_7k) <= 0)
         {
-            ind[0] = Serial_parm(12, &prms);    move16();
+            ind[0] = Serial_parm(12, &prms);    
             DEC_ACELP_2t64_fx(ind[0], code);
         } else if (sub(nb_bits, NBBITS_9k) <= 0)
         {
             for (i = 0; i < 4; i++)
             {
-                ind[i] = Serial_parm(5, &prms); move16();
+                ind[i] = Serial_parm(5, &prms); 
             }
             DEC_ACELP_4t64_fx(ind, 20, code);
         } else if (sub(nb_bits, NBBITS_12k) <= 0)
         {
             for (i = 0; i < 4; i++)
             {
-                ind[i] = Serial_parm(9, &prms); move16();
+                ind[i] = Serial_parm(9, &prms); 
             }
             DEC_ACELP_4t64_fx(ind, 36, code);
         } else if (sub(nb_bits, NBBITS_14k) <= 0)
         {
-            ind[0] = Serial_parm(13, &prms);    move16();
-            ind[1] = Serial_parm(13, &prms);    move16();
-            ind[2] = Serial_parm(9, &prms);move16();
-            ind[3] = Serial_parm(9, &prms);move16();
+            ind[0] = Serial_parm(13, &prms);    
+            ind[1] = Serial_parm(13, &prms);    
+            ind[2] = Serial_parm(9, &prms);
+            ind[3] = Serial_parm(9, &prms);
             DEC_ACELP_4t64_fx(ind, 44, code);
         } else if (sub(nb_bits, NBBITS_16k) <= 0)
         {
             for (i = 0; i < 4; i++)
             {
-                ind[i] = Serial_parm(13, &prms);        move16();
+                ind[i] = Serial_parm(13, &prms);        
             }
             DEC_ACELP_4t64_fx(ind, 52, code);
         } else if (sub(nb_bits, NBBITS_18k) <= 0)
         {
             for (i = 0; i < 4; i++)
             {
-                ind[i] = Serial_parm(2, &prms); move16();
+                ind[i] = Serial_parm(2, &prms); 
             }
             for (i = 4; i < 8; i++)
             {
-                ind[i] = Serial_parm(14, &prms);        move16();
+                ind[i] = Serial_parm(14, &prms);        
             }
             DEC_ACELP_4t64_fx(ind, 64, code);
         } else if (sub(nb_bits, NBBITS_20k) <= 0)
         {
-            ind[0] = Serial_parm(10, &prms);    move16();
-            ind[1] = Serial_parm(10, &prms);    move16();
-            ind[2] = Serial_parm(2, &prms);move16();
-            ind[3] = Serial_parm(2, &prms);move16();
-            ind[4] = Serial_parm(10, &prms);    move16();
-            ind[5] = Serial_parm(10, &prms);    move16();
-            ind[6] = Serial_parm(14, &prms);    move16();
-            ind[7] = Serial_parm(14, &prms);    move16();
+            ind[0] = Serial_parm(10, &prms);    
+            ind[1] = Serial_parm(10, &prms);    
+            ind[2] = Serial_parm(2, &prms);
+            ind[3] = Serial_parm(2, &prms);
+            ind[4] = Serial_parm(10, &prms);    
+            ind[5] = Serial_parm(10, &prms);    
+            ind[6] = Serial_parm(14, &prms);    
+            ind[7] = Serial_parm(14, &prms);    
             DEC_ACELP_4t64_fx(ind, 72, code);
         } else
         {
             for (i = 0; i < 4; i++)
             {
-                ind[i] = Serial_parm(11, &prms);        move16();
+                ind[i] = Serial_parm(11, &prms);        
             }
             for (i = 4; i < 8; i++)
             {
-                ind[i] = Serial_parm(11, &prms);        move16();
+                ind[i] = Serial_parm(11, &prms);        
             }
             DEC_ACELP_4t64_fx(ind, 88, code);
         }
 
-        tmp = 0;                           move16();
+        tmp = 0;                           
         Preemph(code, st->tilt_code, L_SUBFR, &tmp);
 
-        tmp = T0;                          move16();
-        test();
+        tmp = T0;                          
+        
         if (sub(T0_frac, 2) > 0)
         {
             tmp = add(tmp, 1);
@@ -657,7 +657,7 @@ void decoder(
         /*-------------------------------------------------*
          * - Decode codebooks gains.                       *
          *-------------------------------------------------*/
-        test();
+        
         if (sub(nb_bits, NBBITS_9k) <= 0)
         {
             index = Serial_parm(6, &prms); /* codebook gain index */
@@ -675,34 +675,34 @@ void decoder(
         tmp = st->Qsubfr[0];
         for (i = 1; i < 4; i++)
         {
-            test();move16();
+            
             if (sub(st->Qsubfr[i], tmp) < 0)
             {
-                tmp = st->Qsubfr[i];       move16();
+                tmp = st->Qsubfr[i];       
             }
         }
 
         /* limit scaling (Q_new) to Q_MAX: see cnst.h and syn_filt_32() */
-        test();
+        
         if (sub(tmp, Q_MAX) > 0)
         {
-            tmp = Q_MAX;                   move16();
+            tmp = Q_MAX;                   
         }
-        Q_new = 0;                         move16();
-        L_tmp = L_gain_code;               move32();  /* L_gain_code in Q16 */
+        Q_new = 0;                         
+        L_tmp = L_gain_code;                 /* L_gain_code in Q16 */
 
-        test();test();
+        
         while ((L_sub(L_tmp, 0x08000000L) < 0) && (sub(Q_new, tmp) < 0))
         {
             L_tmp = L_shl(L_tmp, 1);
             Q_new = add(Q_new, 1);
-            test();test();
+            
         }
         gain_code = round(L_tmp);          /* scaled gain_code with Qnew */
 
         Scale_sig(exc + i_subfr - (PIT_MAX + L_INTERPOL),
             PIT_MAX + L_INTERPOL + L_SUBFR, sub(Q_new, st->Q_old));
-        st->Q_old = Q_new;                 move16();
+        st->Q_old = Q_new;                 
 
 
         /*----------------------------------------------------------*
@@ -710,18 +710,18 @@ void decoder(
          * - tilt of code: 0.0 (unvoiced) to 0.5 (voiced)           *
          *----------------------------------------------------------*/
 
-        test();
+        
         if (bfi == 0)
         {
             /* LTP-Lag history update */
             for (i = 4; i > 0; i--)
             {
-                st->lag_hist[i] = st->lag_hist[i - 1];  move16();
+                st->lag_hist[i] = st->lag_hist[i - 1];  
             }
-            st->lag_hist[0] = T0;          move16();
+            st->lag_hist[0] = T0;          
 
-            st->old_T0 = T0;               move16();
-            st->old_T0_frac = 0;           move16();  /* Remove fraction in case of BFI */
+            st->old_T0 = T0;               
+            st->old_T0_frac = 0;             /* Remove fraction in case of BFI */
         }
         /* find voice factor in Q15 (1=voiced, -1=unvoiced) */
 
@@ -729,11 +729,11 @@ void decoder(
         Scale_sig(exc2, L_SUBFR, -3);
 
         /* post processing of excitation elements */
-        test();
+        
         if (sub(nb_bits, NBBITS_9k) <= 0)
         {
             pit_sharp = shl(gain_pit, 1);
-            test();
+            
             if (sub(pit_sharp, 16384) > 0)
             {
                 for (i = 0; i < L_SUBFR; i++)
@@ -742,19 +742,19 @@ void decoder(
                     L_tmp = L_mult(tmp, gain_pit);
                     L_tmp = L_shr(L_tmp, 1);
                     excp[i] = round(L_tmp);
-                    move16();
+                    
                 }
             }
         } else
         {
-            pit_sharp = 0;                 move16();
+            pit_sharp = 0;                 
         }
 
         voice_fac = voice_factor(exc2, -3, gain_pit, code, gain_code, L_SUBFR);
 
         /* tilt of code for next subframe: 0.5=voiced, 0=unvoiced */
 
-        st->tilt_code = add(shr(voice_fac, 2), 8192);   move16();
+        st->tilt_code = add(shr(voice_fac, 2), 8192);   
 
         /*-------------------------------------------------------*
          * - Find the total excitation.                          *
@@ -769,29 +769,29 @@ void decoder(
             L_tmp = L_shl(L_tmp, 5);
             L_tmp = L_mac(L_tmp, exc[i + i_subfr], gain_pit);
             L_tmp = L_shl(L_tmp, 1);
-            exc[i + i_subfr] = round(L_tmp);    move16();
+            exc[i + i_subfr] = round(L_tmp);    
         }
 
         /* find maximum value of excitation for next scaling */
 
-        max = 1;                           move16();
+        max = 1;                           
         for (i = 0; i < L_SUBFR; i++)
         {
             tmp = abs_s(exc[i + i_subfr]);
-            test();
+            
             if (sub(tmp, max) > 0)
             {
-                max = tmp;                 move16();
+                max = tmp;                 
             }
         }
 
         /* tmp = scaling possible according to max value of excitation */
         tmp = sub(add(norm_s(max), Q_new), 1);
 
-        st->Qsubfr[3] = st->Qsubfr[2];     move16();
-        st->Qsubfr[2] = st->Qsubfr[1];     move16();
-        st->Qsubfr[1] = st->Qsubfr[0];     move16();
-        st->Qsubfr[0] = tmp;               move16();
+        st->Qsubfr[3] = st->Qsubfr[2];     
+        st->Qsubfr[2] = st->Qsubfr[1];     
+        st->Qsubfr[1] = st->Qsubfr[0];     
+        st->Qsubfr[0] = tmp;               
 
         /*------------------------------------------------------------*
          * phase dispersion to enhance noise in low bit rate          *
@@ -799,7 +799,7 @@ void decoder(
 
         /* L_gain_code in Q16 */
         L_Extract(L_gain_code, &gain_code, &gain_code_lo);
-        test();test();move16();
+        
         if (sub(nb_bits, NBBITS_7k) <= 0)
             j = 0;                         /* high dispersion for rate <= 7.5 kbit/s */
         else if (sub(nb_bits, NBBITS_9k) <= 0)
@@ -821,26 +821,26 @@ void decoder(
         tmp = sub(16384, shr(voice_fac, 1));    /* 1=unvoiced, 0=voiced */
         fac = mult(stab_fac, tmp);
 
-        L_tmp = L_gain_code;               move32();
-        test();
+        L_tmp = L_gain_code;               
+        
         if (L_sub(L_tmp, st->L_gc_thres) < 0)
         {
             L_tmp = L_add(L_tmp, Mpy_32_16(gain_code, gain_code_lo, 6226));
-            test();
+            
             if (L_sub(L_tmp, st->L_gc_thres) > 0)
             {
-                L_tmp = st->L_gc_thres;    move32();
+                L_tmp = st->L_gc_thres;    
             }
         } else
         {
             L_tmp = Mpy_32_16(gain_code, gain_code_lo, 27536);
-            test();
+            
             if (L_sub(L_tmp, st->L_gc_thres) < 0)
             {
-                L_tmp = st->L_gc_thres;    move32();
+                L_tmp = st->L_gc_thres;    
             }
         }
-        st->L_gc_thres = L_tmp;            move32();
+        st->L_gc_thres = L_tmp;            
 
         L_gain_code = Mpy_32_16(gain_code, gain_code_lo, sub(32767, fac));
         L_Extract(L_tmp, &gain_code, &gain_code_lo);
@@ -859,7 +859,7 @@ void decoder(
         L_tmp = L_deposit_h(code[0]);
         L_tmp = L_msu(L_tmp, code[1], tmp);
         code2[0] = round(L_tmp);
-        move16();
+        
 
         for (i = 1; i < L_SUBFR - 1; i++)
         {
@@ -867,13 +867,13 @@ void decoder(
             L_tmp = L_msu(L_tmp, code[i + 1], tmp);
             L_tmp = L_msu(L_tmp, code[i - 1], tmp);
             code2[i] = round(L_tmp);
-            move16();
+            
         }
 
         L_tmp = L_deposit_h(code[L_SUBFR - 1]);
         L_tmp = L_msu(L_tmp, code[L_SUBFR - 2], tmp);
         code2[L_SUBFR - 1] = round(L_tmp);
-        move16();
+        
 
         /* build excitation */
 
@@ -886,7 +886,7 @@ void decoder(
             L_tmp = L_mac(L_tmp, exc2[i], gain_pit);
             L_tmp = L_shl(L_tmp, 1);       /* saturation can occur here */
             exc2[i] = round(L_tmp);
-            move16();
+            
         }
 
         if (sub(nb_bits, NBBITS_9k) <= 0)
@@ -896,7 +896,7 @@ void decoder(
                 for (i = 0; i < L_SUBFR; i++)
                 {
                     excp[i] = add(excp[i], exc2[i]);
-                    move16();
+                    
                 }
                 agc2(exc2, excp, L_SUBFR);
                 Copy(excp, exc2, L_SUBFR);
@@ -937,9 +937,9 @@ void decoder(
     Scale_sig(exc, L_FRAME, sub(0, Q_new));
     dtx_dec_activity_update(st->dtx_decSt, isf, exc);
 
-    st->dtx_decSt->dtxGlobalState = newDTXState;        move16();
+    st->dtx_decSt->dtxGlobalState = newDTXState;        
 
-    st->prev_bfi = bfi;                    move16();
+    st->prev_bfi = bfi;                    
 
     return;
 }
@@ -1015,7 +1015,7 @@ static void synthesis(
     /* generate white noise vector */
     for (i = 0; i < L_SUBFR16k; i++)
     {
-        HF[i] = shr(Random(&(st->seed2)), 3);   move16();
+        HF[i] = shr(Random(&(st->seed2)), 3);   
     }
     /* energy of excitation */
 
@@ -1028,7 +1028,7 @@ static void synthesis(
     /* set energy of white noise to energy of excitation */
 
     tmp = extract_h(Dot_product12(HF, HF, L_SUBFR16k, &exp));
-    test();
+    
     if (sub(tmp, ener) > 0)
     {
         tmp = shr(tmp, 1);                 /* Be sure tmp < ener */
@@ -1041,31 +1041,31 @@ static void synthesis(
     tmp = extract_h(L_tmp);                /* tmp = 2 x sqrt(ener_exc/ener_hf) */
     for (i = 0; i < L_SUBFR16k; i++)
     {
-        HF[i] = mult(HF[i], tmp);          move16();
+        HF[i] = mult(HF[i], tmp);          
     }
     /* find tilt of synthesis speech (tilt: 1=voiced, -1=unvoiced) */
 
     HP400_12k8(synth, L_SUBFR, st->mem_hp400);
 
-    L_tmp = 1L;                            move32();
+    L_tmp = 1L;                            
     for (i = 0; i < L_SUBFR; i++)
         L_tmp = L_mac(L_tmp, synth[i], synth[i]);
 
     exp = norm_l(L_tmp);
     ener = extract_h(L_shl(L_tmp, exp));   /* ener = r[0] */
 
-    L_tmp = 1L;                            move32();
+    L_tmp = 1L;                            
     for (i = 1; i < L_SUBFR; i++)
         L_tmp = L_mac(L_tmp, synth[i], synth[i - 1]);
 
     tmp = extract_h(L_shl(L_tmp, exp));    /* tmp = r[1] */
-    test();
+    
     if (tmp > 0)
     {
         fac = div_s(tmp, ener);
     } else
     {
-        fac = 0;                           move16();
+        fac = 0;                           
     }
 
     /* modify energy of white noise according to synthesis tilt */
@@ -1073,31 +1073,31 @@ static void synthesis(
     gain2 = mult(sub(32767, fac), 20480);
     gain2 = shl(gain2, 1);
 
-    test();
+    
     if (st->vad_hist > 0)
     {
-        weight1 = 0;                       move16();
-        weight2 = 32767;                   move16();
+        weight1 = 0;                       
+        weight2 = 32767;                   
     } else
     {
-        weight1 = 32767;                   move16();
-        weight2 = 0;                       move16();
+        weight1 = 32767;                   
+        weight2 = 0;                       
     }
     tmp = mult(weight1, gain1);
     tmp = add(tmp, mult(weight2, gain2));
 
-    test();
+    
     if (tmp != 0)
     {
         tmp = add(tmp, 1);
     }
-    test();
+    
     if (sub(tmp, 3277) < 0)
     {
         tmp = 3277;                        /* 0.1 in Q15 */
-        move16();
+        
     }
-    test(); test();
+     
     if ((sub(nb_bits, NBBITS_24k) >= 0 ) && (bfi == 0))
     {
         /* HF correction gain */
@@ -1107,17 +1107,17 @@ static void synthesis(
         /* HF gain */
         for (i = 0; i < L_SUBFR16k; i++)
         {
-            HF[i] = shl(mult(HF[i], HF_corr_gain), 1);  move16();
+            HF[i] = shl(mult(HF[i], HF_corr_gain), 1);  
         }
     } else
     {
         for (i = 0; i < L_SUBFR16k; i++)
         {
-            HF[i] = mult(HF[i], tmp);      move16();
+            HF[i] = mult(HF[i], tmp);      
         }
     }
 
-    test();test();
+    
     if ((sub(nb_bits, NBBITS_7k) <= 0) && (sub(newDTXState, SPEECH) == 0))
     {
         Isf_Extrapolation(HfIsf);
@@ -1135,7 +1135,7 @@ static void synthesis(
     /* noise High Pass filtering (1ms of delay) */
     Filt_6k_7k(HF, L_SUBFR16k, st->mem_hf);
 
-    test();
+    
     if (sub(nb_bits, NBBITS_24k) >= 0)
     {
         /* Low Pass filtering (7 kHz) */
@@ -1144,7 +1144,7 @@ static void synthesis(
     /* add filtered HF noise to speech synthesis */
     for (i = 0; i < L_SUBFR16k; i++)
     {
-        synth16k[i] = add(synth16k[i], HF[i]);  move16();
+        synth16k[i] = add(synth16k[i], HF[i]);  
     }
 
     return;

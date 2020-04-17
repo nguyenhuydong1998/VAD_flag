@@ -24,7 +24,7 @@ void Set_zero(
 
     for (i = 0; i < L; i++)
     {
-        x[i] = 0;                          move16();
+        x[i] = 0;                          
     }
 
     return;
@@ -47,7 +47,7 @@ void Copy(
 
     for (i = 0; i < L; i++)
     {
-        y[i] = x[i];                       move16();
+        y[i] = x[i];                       
     }
 
     return;

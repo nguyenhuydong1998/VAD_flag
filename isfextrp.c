@@ -23,37 +23,37 @@ void Isf_Extrapolation(Word16 HfIsf[])
     Word16 exp, exp2, hi, lo;
     Word16 i, MaxCorr;
 
-    HfIsf[M16k - 1] = HfIsf[M - 1];        move16();
+    HfIsf[M16k - 1] = HfIsf[M - 1];        
 
     /* Difference vector */
     for (i = 1; i < (M - 1); i++)
     {
-        IsfDiff[i - 1] = sub(HfIsf[i], HfIsf[i - 1]);   move16();
+        IsfDiff[i - 1] = sub(HfIsf[i], HfIsf[i - 1]);   
     }
-    L_tmp = 0;                             move32();
+    L_tmp = 0;                             
 
     /* Mean of difference vector */
     for (i = 3; i < (M - 1); i++)
         L_tmp = L_mac(L_tmp, IsfDiff[i - 1], INV_LENGTH);
     mean = round(L_tmp);
 
-    IsfCorr[0] = 0;                        move32();
-    IsfCorr[1] = 0;                        move32();
-    IsfCorr[2] = 0;                        move32();
+    IsfCorr[0] = 0;                        
+    IsfCorr[1] = 0;                        
+    IsfCorr[2] = 0;                        
 
-    tmp = 0;                               move16();
+    tmp = 0;                               
     for (i = 0; i < (M - 2); i++)
     {
-        test();
+        
         if (sub(IsfDiff[i], tmp) > 0)
         {
-            tmp = IsfDiff[i];              move16();
+            tmp = IsfDiff[i];              
         }
     }
     exp = norm_s(tmp);
     for (i = 0; i < (M - 2); i++)
     {
-        IsfDiff[i] = shl(IsfDiff[i], exp); move16();
+        IsfDiff[i] = shl(IsfDiff[i], exp); 
     }
     mean = shl(mean, exp);
     for (i = 7; i < (M - 2); i++)
@@ -63,7 +63,7 @@ void Isf_Extrapolation(Word16 HfIsf[])
         L_tmp = L_mult(tmp2, tmp3);
         L_Extract(L_tmp, &hi, &lo);
         L_tmp = Mpy_32(hi, lo, hi, lo);
-        IsfCorr[0] = L_add(IsfCorr[0], L_tmp);  move32();
+        IsfCorr[0] = L_add(IsfCorr[0], L_tmp);  
     }
     for (i = 7; i < (M - 2); i++)
     {
@@ -72,7 +72,7 @@ void Isf_Extrapolation(Word16 HfIsf[])
         L_tmp = L_mult(tmp2, tmp3);
         L_Extract(L_tmp, &hi, &lo);
         L_tmp = Mpy_32(hi, lo, hi, lo);
-        IsfCorr[1] = L_add(IsfCorr[1], L_tmp);  move32();
+        IsfCorr[1] = L_add(IsfCorr[1], L_tmp);  
     }
     for (i = 7; i < (M - 2); i++)
     {
@@ -81,27 +81,27 @@ void Isf_Extrapolation(Word16 HfIsf[])
         L_tmp = L_mult(tmp2, tmp3);
         L_Extract(L_tmp, &hi, &lo);
         L_tmp = Mpy_32(hi, lo, hi, lo);
-        IsfCorr[2] = L_add(IsfCorr[2], L_tmp);  move32();
+        IsfCorr[2] = L_add(IsfCorr[2], L_tmp);  
     }
-    test();
+    
     if (L_sub(IsfCorr[0], IsfCorr[1]) > 0)
     {
-        MaxCorr = 0;                       move16();
+        MaxCorr = 0;                       
     } else
     {
-        MaxCorr = 1;                       move16();
+        MaxCorr = 1;                       
     }
 
-    test();
+    
     if (L_sub(IsfCorr[2], IsfCorr[MaxCorr]) > 0)
-        MaxCorr = 2;                       move16();
+        MaxCorr = 2;                       
 
     MaxCorr = add(MaxCorr, 1);             /* Maximum correlation of difference vector */
 
     for (i = M - 1; i < (M16k - 1); i++)
     {
         tmp = sub(HfIsf[i - 1 - MaxCorr], HfIsf[i - 2 - MaxCorr]);
-        HfIsf[i] = add(HfIsf[i - 1], tmp); move16();
+        HfIsf[i] = add(HfIsf[i - 1], tmp); 
     }
 
     /* tmp=7965+(HfIsf[2]-HfIsf[3]-HfIsf[4])/6; */
@@ -110,10 +110,10 @@ void Isf_Extrapolation(Word16 HfIsf[])
     tmp = mult(tmp, 5461);
     tmp = add(tmp, 20390);
 
-    test();
+    
     if (sub(tmp, 19456) > 0)
     {                                      /* Maximum value of ISF should be at most 7600 Hz */
-        tmp = 19456;                       move16();
+        tmp = 19456;                       
     }
     tmp = sub(tmp, HfIsf[M - 2]);
     tmp2 = sub(HfIsf[M16k - 2], HfIsf[M - 2]);
@@ -129,35 +129,35 @@ void Isf_Extrapolation(Word16 HfIsf[])
     for (i = M - 1; i < (M16k - 1); i++)
     {
         tmp = mult(sub(HfIsf[i], HfIsf[i - 1]), coeff);
-        IsfDiff[i - (M - 1)] = shl(tmp, exp);   move16();
+        IsfDiff[i - (M - 1)] = shl(tmp, exp);   
     }
 
     for (i = M; i < (M16k - 1); i++)
     {
         /* The difference between ISF(n) and ISF(n-2) should be at least 500 Hz */
         tmp = sub(add(IsfDiff[i - (M - 1)], IsfDiff[i - M]), 1280);
-        test();
+        
         if (tmp < 0)
         {
-            test();
+            
             if (sub(IsfDiff[i - (M - 1)], IsfDiff[i - M]) > 0)
             {
-                IsfDiff[i - M] = sub(1280, IsfDiff[i - (M - 1)]);       move16();
+                IsfDiff[i - M] = sub(1280, IsfDiff[i - (M - 1)]);       
             } else
             {
-                IsfDiff[i - (M - 1)] = sub(1280, IsfDiff[i - M]);       move16();
+                IsfDiff[i - (M - 1)] = sub(1280, IsfDiff[i - M]);       
             }
         }
     }
 
     for (i = M - 1; i < (M16k - 1); i++)
     {
-        HfIsf[i] = add(HfIsf[i - 1], IsfDiff[i - (M - 1)]);     move16();
+        HfIsf[i] = add(HfIsf[i - 1], IsfDiff[i - (M - 1)]);     
     }
 
     for (i = 0; i < (M16k - 1); i++)
     {
-        move16();
+        
         HfIsf[i] = mult(HfIsf[i], 26214);  /* Scale the ISF vector correctly for 16000 kHz */
     }
 

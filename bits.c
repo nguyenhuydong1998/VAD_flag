@@ -25,7 +25,7 @@ Word16 Init_write_serial(TX_State ** st)
    TX_State *s;
 
    /* allocate memory */
-    test();
+    
     if ((s = (TX_State *) malloc(sizeof(TX_State))) == NULL)
     {
         fprintf(stderr, "write_serial_init: can not malloc state structure\n");
@@ -40,7 +40,7 @@ Word16 Init_write_serial(TX_State ** st)
 Word16 Close_write_serial(TX_State *st)
 {
    /* allocate memory */
-    test();
+    
     if (st != NULL)
     {
         free(st);
@@ -228,7 +228,7 @@ Word16 Init_read_serial(RX_State ** st)
    RX_State *s;
 
    /* allocate memory */
-    test();
+    
     if ((s = (RX_State *) malloc(sizeof(RX_State))) == NULL)
     {
         fprintf(stderr, "read_serial_init: can not malloc state structure\n");
@@ -243,7 +243,7 @@ Word16 Init_read_serial(RX_State ** st)
 Word16 Close_read_serial(RX_State *st)
 {
    /* allocate memory */
-    test();
+    
     if (st != NULL)
     {
         free(st);
@@ -490,19 +490,19 @@ void Parm_serial(
 {
     Word16 i, bit;
 
-    *prms += no_of_bits;                   move16();
+    *prms += no_of_bits;                   
 
     for (i = 0; i < no_of_bits; i++)
     {
-        bit = (Word16) (value & 0x0001);   logic16();  /* get lsb */
-        test();move16();
+        bit = (Word16) (value & 0x0001);     /* get lsb */
+        
         if (bit == 0)
             *--(*prms) = BIT_0;
         else
             *--(*prms) = BIT_1;
-        value = shr(value, 1);             move16();
+        value = shr(value, 1);             
     }
-    *prms += no_of_bits;                   move16();
+    *prms += no_of_bits;                   
     return;
 }
 
@@ -519,12 +519,12 @@ Word16 Serial_parm(                        /* Return the parameter    */
     Word16 value, i;
     Word16 bit;
 
-    value = 0;                             move16();
+    value = 0;                             
     for (i = 0; i < no_of_bits; i++)
     {
         value = shl(value, 1);
-        bit = *((*prms)++);                move16();
-        test();move16();
+        bit = *((*prms)++);                
+        
         if (bit == BIT_1)
             value = add(value, 1);
     }

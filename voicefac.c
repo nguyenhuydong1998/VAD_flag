@@ -39,7 +39,7 @@ Word16 voice_factor(                       /* (o) Q15   : factor (-1=unvoiced to
 
     i = sub(exp1, exp2);
 
-    test();
+    
     if (i >= 0)
     {
         ener1 = shr(ener1, 1);
@@ -53,7 +53,7 @@ Word16 voice_factor(                       /* (o) Q15   : factor (-1=unvoiced to
     tmp = sub(ener1, ener2);
     ener1 = add(add(ener1, ener2), 1);
 
-    test();
+    
     if (tmp >= 0)
     {
         tmp = div_s(tmp, ener1);

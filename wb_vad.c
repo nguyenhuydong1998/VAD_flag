@@ -45,10 +45,10 @@ Word16 ilog2(                              /* return: output value of the log2 *
     Word16 i, ex, ex2, res;
     Word32 l_temp;
 
-    test();
+    
     if (mant <= 0)
     {
-        mant = 1;                          move16();
+        mant = 1;                          
     }
     ex = norm_s(mant);
     mant = shl(mant, ex);
@@ -83,14 +83,14 @@ static void filter5(
 
     temp0 = sub(*in0, mult(COEFF5_1, data[0]));
     temp1 = add(data[0], mult(COEFF5_1, temp0));
-    data[0] = temp0;                       move16();
+    data[0] = temp0;                       
 
     temp0 = sub(*in1, mult(COEFF5_2, data[1]));
     temp2 = add(data[1], mult(COEFF5_2, temp0));
-    data[1] = temp0;                       move16();
+    data[1] = temp0;                       
 
-    *in0 = extract_h(L_shl(L_add(temp1, temp2), 15));   move16();
-    *in1 = extract_h(L_shl(L_sub(temp1, temp2), 15));   move16();
+    *in0 = extract_h(L_shl(L_add(temp1, temp2), 15));   
+    *in1 = extract_h(L_shl(L_sub(temp1, temp2), 15));   
 }
 
 /******************************************************************************
@@ -110,10 +110,10 @@ static void filter3(
 
     temp1 = sub(*in1, mult(COEFF3, *data));
     temp2 = add(*data, mult(COEFF3, temp1));
-    *data = temp1;                         move16();
+    *data = temp1;                         
 
-    *in1 = extract_h(L_shl(L_sub(*in0, temp2), 15));    move16();
-    *in0 = extract_h(L_shl(L_add(*in0, temp2), 15));    move16();
+    *in1 = extract_h(L_shl(L_sub(*in0, temp2), 15));    
+    *in0 = extract_h(L_shl(L_add(*in0, temp2), 15));    
 }
 
 /******************************************************************************
@@ -142,14 +142,14 @@ static Word16 level_calculation(           /* return: signal level */
     Word32 l_temp1, l_temp2;
     Word16 level, i;
 
-    l_temp1 = 0L;                          move32();
+    l_temp1 = 0L;                          
     for (i = count1; i < count2; i++)
     {
         l_temp1 = L_mac(l_temp1, 1, abs_s(data[ind_m * i + ind_a]));
     }
 
     l_temp2 = L_add(l_temp1, L_shl(*sub_level, sub(16, scale)));
-    *sub_level = extract_h(L_shl(l_temp1, scale));      move16();
+    *sub_level = extract_h(L_shl(l_temp1, scale));      
 
     for (i = 0; i < count1; i++)
     {
@@ -179,7 +179,7 @@ static void filter_bank(
     /* shift input 1 bit down for safe scaling */
     for (i = 0; i < FRAME_LEN; i++)
     {
-        tmp_buf[i] = shr(in[i], 1);        move16();
+        tmp_buf[i] = shr(in[i], 1);        
     }
 
     /* run the filter bank */
@@ -215,40 +215,40 @@ static void filter_bank(
 
     /* 4800 - 6400 Hz */
     level[11] = level_calculation(tmp_buf, &st->sub_level[11],
-        FRAME_LEN / 4 - 48, FRAME_LEN / 4, 4, 1, 14);   move16();
+        FRAME_LEN / 4 - 48, FRAME_LEN / 4, 4, 1, 14);   
     /* 4000 - 4800 Hz */
     level[10] = level_calculation(tmp_buf, &st->sub_level[10],
-        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 7, 15);   move16();
+        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 7, 15);   
     /* 3200 - 4000 Hz */
     level[9] = level_calculation(tmp_buf, &st->sub_level[9],
-        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 3, 15);   move16();
+        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 3, 15);   
     /* 2400 - 3200 Hz */
     level[8] = level_calculation(tmp_buf, &st->sub_level[8],
-        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 2, 15);   move16();
+        FRAME_LEN / 8 - 24, FRAME_LEN / 8, 8, 2, 15);   
     /* 2000 - 2400 Hz */
     level[7] = level_calculation(tmp_buf, &st->sub_level[7],
-        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 14, 16);       move16();
+        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 14, 16);       
     /* 1600 - 2000 Hz */
     level[6] = level_calculation(tmp_buf, &st->sub_level[6],
-        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 6, 16);        move16();
+        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 6, 16);        
     /* 1200 - 1600 Hz */
     level[5] = level_calculation(tmp_buf, &st->sub_level[5],
-        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 4, 16);        move16();
+        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 4, 16);        
     /* 800 - 1200 Hz */
     level[4] = level_calculation(tmp_buf, &st->sub_level[4],
-        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 12, 16);       move16();
+        FRAME_LEN / 16 - 12, FRAME_LEN / 16, 16, 12, 16);       
     /* 600 - 800 Hz */
     level[3] = level_calculation(tmp_buf, &st->sub_level[3],
-        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 8, 17); move16();
+        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 8, 17); 
     /* 400 - 600 Hz */
     level[2] = level_calculation(tmp_buf, &st->sub_level[2],
-        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 24, 17);        move16();
+        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 24, 17);        
     /* 200 - 400 Hz */
     level[1] = level_calculation(tmp_buf, &st->sub_level[1],
-        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 16, 17);        move16();
+        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 16, 17);        
     /* 0 - 200 Hz */
     level[0] = level_calculation(tmp_buf, &st->sub_level[0],
-        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 0, 17); move16();
+        FRAME_LEN / 32 - 6, FRAME_LEN / 32, 32, 0, 17); 
 }
 
 /******************************************************************************
@@ -267,42 +267,42 @@ static void update_cntrl(
     Word16 alpha;
 
     /* if a tone has been detected for a while, initialize stat_count */
-    logic16();test();
+    
     if (sub((Word16) (st->tone_flag & 0x7c00), 0x7c00) == 0)
     {
-        st->stat_count = STAT_COUNT;       move16();
+        st->stat_count = STAT_COUNT;       
     } else
     {
         /* if 8 last vad-decisions have been "0", reinitialize stat_count */
-        logic16();test();
+        
         if ((st->vadreg & 0x7f80) == 0)
         {
-            st->stat_count = STAT_COUNT;   move16();
+            st->stat_count = STAT_COUNT;   
         } else
         {
-            stat_rat = 0;                  move16();
+            stat_rat = 0;                  
             for (i = 0; i < COMPLEN; i++)
             {
-                test();
+                
                 if (sub(level[i], st->ave_level[i]) > 0)
                 {
-                    num = level[i];        move16();
-                    denom = st->ave_level[i];   move16();
+                    num = level[i];        
+                    denom = st->ave_level[i];   
                 } else
                 {
-                    num = st->ave_level[i];move16();
-                    denom = level[i];      move16();
+                    num = st->ave_level[i];
+                    denom = level[i];      
                 }
                 /* Limit nimimum value of num and denom to STAT_THR_LEVEL */
-                test();
+                
                 if (sub(num, STAT_THR_LEVEL) < 0)
                 {
-                    num = STAT_THR_LEVEL;  move16();
+                    num = STAT_THR_LEVEL;  
                 }
-                test();
+                
                 if (sub(denom, STAT_THR_LEVEL) < 0)
                 {
-                    denom = STAT_THR_LEVEL;move16();
+                    denom = STAT_THR_LEVEL;
                 }
                 exp = norm_s(denom);
                 denom = shl(denom, exp);
@@ -313,19 +313,19 @@ static void update_cntrl(
             }
 
             /* compare stat_rat with a threshold and update stat_count */
-            test();
+            
             if (sub(stat_rat, STAT_THR) > 0)
             {
-                st->stat_count = STAT_COUNT;    move16();
+                st->stat_count = STAT_COUNT;    
             } else
             {
-                logic16();test();
+                
                 if ((st->vadreg & 0x4000) != 0)
                 {
-                    test();
+                    
                     if (st->stat_count != 0)
                     {
-                        st->stat_count = sub(st->stat_count, 1);        move16();
+                        st->stat_count = sub(st->stat_count, 1);        
                     }
                 }
             }
@@ -333,20 +333,20 @@ static void update_cntrl(
     }
 
     /* Update average amplitude estimate for stationarity estimation */
-    alpha = ALPHA4;                        move16();
-    test();test();logic16();
+    alpha = ALPHA4;                        
+    
     if (sub(st->stat_count, STAT_COUNT) == 0)
     {
-        alpha = 32767;                     move16();
+        alpha = 32767;                     
     } else if ((st->vadreg & 0x4000) == 0)
     {
-        logic16();test();
-        alpha = ALPHA5;                    move16();
+        
+        alpha = ALPHA5;                    
     }
     for (i = 0; i < COMPLEN; i++)
     {
         st->ave_level[i] = add(st->ave_level[i],
-            mult_r(alpha, sub(level[i], st->ave_level[i])));    move16();
+            mult_r(alpha, sub(level[i], st->ave_level[i])));    
     }
 }
 
@@ -365,31 +365,31 @@ static Word16 hangover_addition(           /* return: VAD_flag indicating final 
 )
 {
     /* if the input power (pow_sum) is lower than a threshold, clear counters and set VAD_flag to "0"         */
-    test();
+    
     if (low_power != 0)
     {
-        st->burst_count = 0;               move16();
-        st->hang_count = 0;                move16();
+        st->burst_count = 0;               
+        st->hang_count = 0;                
         return 0;
     }
     /* update the counters (hang_count, burst_count) */
-    logic16();test();
+    
     if ((st->vadreg & 0x4000) != 0)
     {
-        st->burst_count = add(st->burst_count, 1);      move16();
-        test();
+        st->burst_count = add(st->burst_count, 1);      
+        
         if (sub(st->burst_count, burst_len) >= 0)
         {
-            st->hang_count = hang_len;     move16();
+            st->hang_count = hang_len;     
         }
         return 1;
     } else
     {
-        st->burst_count = 0;               move16();
-        test();
+        st->burst_count = 0;               
+        
         if (st->hang_count > 0)
         {
-            st->hang_count = sub(st->hang_count, 1);    move16();
+            st->hang_count = sub(st->hang_count, 1);    
             return 1;
         }
     }
@@ -415,26 +415,26 @@ static void noise_estimate_update(
 
     /* Reason for using bckr_add is to avoid problems caused by fixed-point dynamics when noise level and
      * required change is very small. */
-    bckr_add = 2;                          move16();
+    bckr_add = 2;                          
 
     /* Choose update speed */
-    logic16();test();
+    
     if ((0x7800 & st->vadreg) == 0)
     {
-        alpha_up = ALPHA_UP1;              move16();
-        alpha_down = ALPHA_DOWN1;          move16();
+        alpha_up = ALPHA_UP1;              
+        alpha_down = ALPHA_DOWN1;          
     } else
     {
-        test();
+        
         if ((st->stat_count == 0))
         {
-            alpha_up = ALPHA_UP2;          move16();
-            alpha_down = ALPHA_DOWN2;      move16();
+            alpha_up = ALPHA_UP2;          
+            alpha_down = ALPHA_DOWN2;      
         } else
         {
-            alpha_up = 0;                  move16();
-            alpha_down = ALPHA3;           move16();
-            bckr_add = 0;                  move16();
+            alpha_up = 0;                  
+            alpha_down = ALPHA3;           
+            bckr_add = 0;                  
         }
     }
 
@@ -445,28 +445,28 @@ static void noise_estimate_update(
 
         temp = sub(st->old_level[i], st->bckr_est[i]);
 
-        test();
+        
         if (temp < 0)
         {                                  /* update downwards */
             st->bckr_est[i] = add(-2, add(st->bckr_est[i],
-                    mult_r(alpha_down, temp))); move16();
+                    mult_r(alpha_down, temp))); 
 
             /* limit minimum value of the noise estimate to NOISE_MIN */
-            test();
+            
             if (sub(st->bckr_est[i], NOISE_MIN) < 0)
             {
-                st->bckr_est[i] = NOISE_MIN;    move16();
+                st->bckr_est[i] = NOISE_MIN;    
             }
         } else
         {                                  /* update upwards */
             st->bckr_est[i] = add(bckr_add, add(st->bckr_est[i],
-                    mult_r(alpha_up, temp)));   move16();
+                    mult_r(alpha_up, temp)));   
 
             /* limit maximum value of the noise estimate to NOISE_MAX */
-            test();
+            
             if (sub(st->bckr_est[i], NOISE_MAX) > 0)
             {
-                st->bckr_est[i] = NOISE_MAX;    move16();
+                st->bckr_est[i] = NOISE_MAX;    
             }
         }
     }
@@ -474,7 +474,7 @@ static void noise_estimate_update(
     /* Update signal levels of the previous frame (old_level) */
     for (i = 0; i < COMPLEN; i++)
     {
-        st->old_level[i] = level[i];       move16();
+        st->old_level[i] = level[i];       
     }
 }
 
@@ -502,7 +502,7 @@ static Word16 vad_decision(                /* return value : VAD_flag */
 
     /* Calculate squared sum of the input levels (level) divided by the background noise components
      * (bckr_est). */
-    L_snr_sum = 0;                         move32();
+    L_snr_sum = 0;                         
     for (i = 0; i < COMPLEN; i++)
     {
         Word16 exp;
@@ -515,7 +515,7 @@ static Word16 vad_decision(                /* return value : VAD_flag */
     }
 
     /* Calculate average level of estimated background noise */
-    L_temp = 0;                            move32();
+    L_temp = 0;                            
     for (i = 1; i < COMPLEN; i++)          /* ignore lowest band */
     {
         L_temp = L_add(L_temp, st->bckr_est[i]);
@@ -525,10 +525,10 @@ static Word16 vad_decision(                /* return value : VAD_flag */
     /* if SNR is lower than a threshold (MIN_SPEECH_SNR), and increase speech_level */
     temp = shl(mult(noise_level, MIN_SPEECH_SNR), 3);
 
-    test();
+    
     if (sub(st->speech_level, temp) < 0)
     {
-        st->speech_level = temp;           move16();
+        st->speech_level = temp;           
     }
     ilog2_noise_level = ilog2(noise_level);
 
@@ -539,50 +539,50 @@ static Word16 vad_decision(                /* return value : VAD_flag */
     temp = add(mult(NO_SLOPE, sub(ilog2_noise_level, NO_P1)), THR_HIGH);
 
     temp2 = add(SP_CH_MIN, mult(SP_SLOPE, sub(ilog2_speech_level, SP_P1)));
-    test();
+    
     if (sub(temp2, SP_CH_MIN) < 0)
     {
-        temp2 = SP_CH_MIN;                 move16();
+        temp2 = SP_CH_MIN;                 
     }
-    test();
+    
     if (sub(temp2, SP_CH_MAX) > 0)
     {
-        temp2 = SP_CH_MAX;                 move16();
+        temp2 = SP_CH_MAX;                 
     }
     vad_thr = add(temp, temp2);
 
-    test();
+    
     if (sub(vad_thr, THR_MIN) < 0)
     {
-        vad_thr = THR_MIN;                 move16();
+        vad_thr = THR_MIN;                 
     }
     /* Shift VAD decision register */
-    st->vadreg = shr(st->vadreg, 1);       move16();
+    st->vadreg = shr(st->vadreg, 1);       
 
     /* Make intermediate VAD decision */
-    test();
+    
     if (L_sub(L_snr_sum, L_mult(vad_thr, 512 * COMPLEN)) > 0)
     {
-        st->vadreg = (Word16) (st->vadreg | 0x4000);    logic16();move16();
+        st->vadreg = (Word16) (st->vadreg | 0x4000);    
     }
     /* check if the input power (pow_sum) is lower than a threshold" */
-    test();
+    
     if (L_sub(pow_sum, VAD_POW_LOW) < 0)
     {
-        low_power_flag = 1;                move16();
+        low_power_flag = 1;                
     } else
     {
-        low_power_flag = 0;                move16();
+        low_power_flag = 0;                
     }
     /* Update background noise estimates */
     noise_estimate_update(st, level);
 
     /* Calculate values for hang_len and burst_len based on vad_thr */
     hang_len = add(mult(HANG_SLOPE, sub(vad_thr, HANG_P1)), HANG_HIGH);
-    test();
+    
     if (sub(hang_len, HANG_LOW) < 0)
     {
-        hang_len = HANG_LOW;               move16();
+        hang_len = HANG_LOW;               
     };
 
     burst_len = add(mult(BURST_SLOPE, sub(vad_thr, BURST_P1)), BURST_HIGH);
@@ -609,28 +609,28 @@ static void Estimate_Speech(
     Word16 alpha;
 
     /* if the required activity count cannot be achieved, reset counters */
-    test();
+    
     /* if (SP_ACTIVITY_COUNT  > SP_EST_COUNT - st->sp_est_cnt + st->sp_max_cnt) */
     if (sub(sub(st->sp_est_cnt, st->sp_max_cnt), SP_EST_COUNT - SP_ACTIVITY_COUNT) > 0)
     {
-        st->sp_est_cnt = 0;                move16();
-        st->sp_max = 0;                    move16();
-        st->sp_max_cnt = 0;                move16();
+        st->sp_est_cnt = 0;                
+        st->sp_max = 0;                    
+        st->sp_max_cnt = 0;                
     }
-    st->sp_est_cnt = add(st->sp_est_cnt, 1);    move16();
+    st->sp_est_cnt = add(st->sp_est_cnt, 1);    
 
-    logic16();test();test();test();
+    
     if (((st->vadreg & 0x4000) || (sub(in_level, st->speech_level) > 0))
         && (sub(in_level, MIN_SPEECH_LEVEL1) > 0))
     {
         /* update sp_max */
-        test();
+        
         if (sub(in_level, st->sp_max) > 0)
         {
-            st->sp_max = in_level;         move16();
+            st->sp_max = in_level;         
         }
-        st->sp_max_cnt = add(st->sp_max_cnt, 1);        move16();
-        test();
+        st->sp_max_cnt = add(st->sp_max_cnt, 1);        
+        
         if (sub(st->sp_max_cnt, SP_ACTIVITY_COUNT) >= 0)
         {
             Word16 tmp;
@@ -639,24 +639,24 @@ static void Estimate_Speech(
             tmp = shr(st->sp_max, 1);      /* scale to get "average" speech level */
 
             /* select update speed */
-            test();
+            
             if (sub(tmp, st->speech_level) > 0)
             {
-                alpha = ALPHA_SP_UP;       move16();
+                alpha = ALPHA_SP_UP;       
             } else
             {
-                alpha = ALPHA_SP_DOWN;     move16();
+                alpha = ALPHA_SP_DOWN;     
             }
-            test();
+            
             if (sub(tmp, MIN_SPEECH_LEVEL2) > 0)
             {
                 st->speech_level = add(st->speech_level,
-                    mult_r(alpha, sub(tmp, st->speech_level))); move16();
+                    mult_r(alpha, sub(tmp, st->speech_level))); 
             }
             /* clear all counters used for speech estimation */
-            st->sp_max = 0;                move16();
-            st->sp_max_cnt = 0;            move16();
-            st->sp_est_cnt = 0;            move16();
+            st->sp_max = 0;                
+            st->sp_max_cnt = 0;            
+            st->sp_est_cnt = 0;            
         }
     }
 }
@@ -785,13 +785,13 @@ void wb_vad_tone_detection(
 )
 {
     /* update tone flag */
-    st->tone_flag = shr(st->tone_flag, 1); move16();
+    st->tone_flag = shr(st->tone_flag, 1); 
 
     /* if (pitch_gain > TONE_THR) set tone flag */
-    test();
+    
     if (sub(p_gain, TONE_THR) > 0)
     {
-        st->tone_flag = (Word16) (st->tone_flag | 0x4000);      logic16();move16();
+        st->tone_flag = (Word16) (st->tone_flag | 0x4000);      
     }
 }
 
@@ -812,23 +812,23 @@ Word16 wb_vad(                             /* Return value : VAD Decision, 1 = s
     Word32 L_temp, pow_sum;
 
     /* Calculate power of the input frame. */
-    L_temp = 0L;                           move32();
+    L_temp = 0L;                           
     for (i = 0; i < FRAME_LEN; i++)
     {
         L_temp = L_mac(L_temp, in_buf[i], in_buf[i]);
     }
 
     /* pow_sum = power of current frame and previous frame */
-    pow_sum = L_add(L_temp, st->prev_pow_sum);  move32();
+    pow_sum = L_add(L_temp, st->prev_pow_sum);  
 
     /* save power of current frame for next call */
-    st->prev_pow_sum = L_temp;             move32();
+    st->prev_pow_sum = L_temp;             
 
     /* If input power is very low, clear tone flag */
-    test();
+    
     if (L_sub(pow_sum, POW_TONE_THR) < 0)
     {
-        st->tone_flag = (Word16) (st->tone_flag & 0x1fff);      logic16();move16();
+        st->tone_flag = (Word16) (st->tone_flag & 0x1fff);      
     }
     /* Run the filter bank and calculate signal levels at each band */
     filter_bank(st, in_buf, level);
@@ -837,7 +837,7 @@ Word16 wb_vad(                             /* Return value : VAD Decision, 1 = s
     VAD_flag = vad_decision(st, level, pow_sum);
 
     /* Calculate input level */
-    L_temp = 0;                            move32();
+    L_temp = 0;                            
     for (i = 1; i < COMPLEN; i++)          /* ignore lowest band */
     {
         L_temp = L_add(L_temp, level[i]);

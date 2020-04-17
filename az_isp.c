@@ -71,13 +71,13 @@ void Az_isp(
     for (i = 0; i < NC; i++)
     {
         t0 = L_mult(a[i], 16384);
-        f1[i] = round(L_mac(t0, a[M - i], 16384));      move16();  /* =(a[i]+a[M-i])/2 */
-        f2[i] = round(L_msu(t0, a[M - i], 16384));      move16();  /* =(a[i]-a[M-i])/2 */
+        f1[i] = round(L_mac(t0, a[M - i], 16384));        /* =(a[i]+a[M-i])/2 */
+        f2[i] = round(L_msu(t0, a[M - i], 16384));        /* =(a[i]-a[M-i])/2 */
     }
-    f1[NC] = a[NC];                        move16();
+    f1[NC] = a[NC];                        
 
     for (i = 2; i < NC; i++)               /* Divide by (1-z^-2) */
-        f2[i] = add(f2[i], f2[i - 2]);     move16();
+        f2[i] = add(f2[i], f2[i - 2]);     
 
     /*---------------------------------------------------------------------*
      * Find the ISPs (roots of F1(z) and F2(z) ) using the                 *
@@ -91,26 +91,26 @@ void Az_isp(
      *    2 times and ckecking sign change.                                *
      *---------------------------------------------------------------------*/
 
-    nf = 0;                                move16();  /* number of found frequencies */
-    ip = 0;                                move16();  /* indicator for f1 or f2      */
+    nf = 0;                                  /* number of found frequencies */
+    ip = 0;                                  /* indicator for f1 or f2      */
 
-    coef = f1;                             move16();
-    order = NC;                            move16();
+    coef = f1;                             
+    order = NC;                            
 
-    xlow = grid[0];                        move16();
+    xlow = grid[0];                        
     ylow = Chebps2(xlow, coef, order);
 
     j = 0;
-    test();test();
+    
     while ((nf < M - 1) && (j < GRID_POINTS))
     {
         j = add(j, 1);
-        xhigh = xlow;                      move16();
-        yhigh = ylow;                      move16();
-        xlow = grid[j];                    move16();
+        xhigh = xlow;                      
+        yhigh = ylow;                      
+        xlow = grid[j];                    
         ylow = Chebps2(xlow, coef, order);
 
-        test();
+        
         if (L_mult(ylow, yhigh) <= (Word32) 0)
         {
             /* divide 2 times the interval */
@@ -121,15 +121,15 @@ void Az_isp(
 
                 ymid = Chebps2(xmid, coef, order);
 
-                test();
+                
                 if (L_mult(ylow, ymid) <= (Word32) 0)
                 {
-                    yhigh = ymid;          move16();
-                    xhigh = xmid;          move16();
+                    yhigh = ymid;          
+                    xhigh = xmid;          
                 } else
                 {
-                    ylow = ymid;           move16();
-                    xlow = xmid;           move16();
+                    ylow = ymid;           
+                    xlow = xmid;           
                 }
             }
 
@@ -141,13 +141,13 @@ void Az_isp(
             x = sub(xhigh, xlow);
             y = sub(yhigh, ylow);
 
-            test();
+            
             if (y == 0)
             {
-                xint = xlow;               move16();
+                xint = xlow;               
             } else
             {
-                sign = y;                  move16();
+                sign = y;                  
                 y = abs_s(y);
                 exp = norm_s(y);
                 y = shl(y, exp);
@@ -156,7 +156,7 @@ void Az_isp(
                 t0 = L_shr(t0, sub(20, exp));
                 y = extract_l(t0);         /* y= (xhigh-xlow)/(yhigh-ylow) in Q11 */
 
-                test();
+                
                 if (sign < 0)
                     y = negate(y);
 
@@ -165,39 +165,39 @@ void Az_isp(
                 xint = sub(xlow, extract_l(t0));        /* xint = xlow - ylow*y */
             }
 
-            isp[nf] = xint;                move16();
-            xlow = xint;                   move16();
-            nf++;                          move16();
+            isp[nf] = xint;                
+            xlow = xint;                   
+            nf++;                          
 
-            test();
+            
             if (ip == 0)
             {
-                ip = 1;                    move16();
-                coef = f2;                 move16();
-                order = NC - 1;            move16();
+                ip = 1;                    
+                coef = f2;                 
+                order = NC - 1;            
             } else
             {
-                ip = 0;                    move16();
-                coef = f1;                 move16();
-                order = NC;                move16();
+                ip = 0;                    
+                coef = f1;                 
+                order = NC;                
             }
             ylow = Chebps2(xlow, coef, order);
         }
-        test();test();
+        
     }
 
     /* Check if M-1 roots found */
 
-    test();
+    
     if (sub(nf, M - 1) < 0)
     {
         for (i = 0; i < M; i++)
         {
-            isp[i] = old_isp[i];           move16();
+            isp[i] = old_isp[i];           
         }
     } else
     {
-        isp[M - 1] = shl(a[M], 3);         move16();  /* From Q12 to Q15 with saturation */
+        isp[M - 1] = shl(a[M], 3);           /* From Q12 to Q15 with saturation */
     }
 
     return;
@@ -250,10 +250,10 @@ static Word16 Chebps2(Word16 x, Word16 f[], Word16 n)
 
         L_Extract(t0, &b0_h, &b0_l);       /* b0 = 2.0*x*b1 - b2 + f[i]; */
 
-        b2_l = b1_l;                       move16();  /* b2 = b1; */
-        b2_h = b1_h;                       move16();
-        b1_l = b0_l;                       move16();  /* b1 = b0; */
-        b1_h = b0_h;                       move16();
+        b2_l = b1_l;                         /* b2 = b1; */
+        b2_h = b1_h;                       
+        b1_l = b0_l;                         /* b1 = b0; */
+        b1_h = b0_h;                       
     }
 
     t0 = Mpy_32_16(b1_h, b1_l, x);         /* t0 = x*b1;              */
@@ -265,11 +265,11 @@ static Word16 Chebps2(Word16 x, Word16 f[], Word16 n)
 
     cheb = extract_h(t0);                  /* Result in Q14              */
 
-    test();
+    
     if (sub(cheb, -32768) == 0)
     {
         cheb = -32767;                     /* to avoid saturation in Az_isp */
-        move16();
+        
     }
     return (cheb);
 }

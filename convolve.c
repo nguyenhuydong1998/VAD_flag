@@ -22,11 +22,11 @@ void Convolve(
 
     for (n = 0; n < L; n++)
     {
-        L_sum = 0L;                        move32();
+        L_sum = 0L;                        
         for (i = 0; i <= n; i++)
             L_sum = L_mac(L_sum, x[i], h[n - i]);
 
-        y[n] = round(L_sum);               move16();
+        y[n] = round(L_sum);               
     }
 
     return;

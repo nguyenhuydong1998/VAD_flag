@@ -25,12 +25,12 @@ void Syn_filt(
     Word32 L_tmp;
     Word16 *yy;
 
-    yy = &y_buf[0];                        move16();
+    yy = &y_buf[0];                        
 
     /* copy initial filter states into synthesis buffer */
     for (i = 0; i < m; i++)
     {
-        *yy++ = mem[i];                    move16();
+        *yy++ = mem[i];                    
     }
 
     s = sub(norm_s(a[0]), 2);
@@ -47,15 +47,15 @@ void Syn_filt(
 
         L_tmp = L_shl(L_tmp, add(3, s));
 
-        y[i] = yy[i] = round(L_tmp);       move16();move16();
+        y[i] = yy[i] = round(L_tmp);       
     }
 
     /* Update memory if required */
-    test();
+    
     if (update)
         for (i = 0; i < m; i++)
         {
-            mem[i] = yy[lg - m + i];       move16();
+            mem[i] = yy[lg - m + i];       
         }
 
     return;
@@ -83,7 +83,7 @@ void Syn_filt_32(
 
     for (i = 0; i < lg; i++)
     {
-        L_tmp = 0;                         move32();
+        L_tmp = 0;                         
         for (j = 1; j <= m; j++)
             L_tmp = L_msu(L_tmp, sig_lo[i - j], a[j]);
 
@@ -96,11 +96,11 @@ void Syn_filt_32(
 
         /* sig_hi = bit16 to bit31 of synthesis */
         L_tmp = L_shl(L_tmp, add(3, s));           /* ai in Q12 */
-        sig_hi[i] = extract_h(L_tmp);      move16();
+        sig_hi[i] = extract_h(L_tmp);      
 
         /* sig_lo = bit4 to bit15 of synthesis */
         L_tmp = L_shr(L_tmp, 4);           /* 4 : sig_lo[i] >> 4 */
-        sig_lo[i] = extract_l(L_msu(L_tmp, sig_hi[i], 2048));   move16();
+        sig_lo[i] = extract_l(L_msu(L_tmp, sig_hi[i], 2048));   
     }
 
     return;

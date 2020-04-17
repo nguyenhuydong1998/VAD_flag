@@ -22,7 +22,7 @@ void Scale_sig(
     {
         L_tmp = L_deposit_h(x[i]);
         L_tmp = L_shl(L_tmp, exp);         /* saturation can occur here */
-        x[i] = round(L_tmp);               move16();
+        x[i] = round(L_tmp);               
     }
 
     return;

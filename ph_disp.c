@@ -74,7 +74,7 @@ void Phase_dispersion(
 
     Set_zero(code2, 2 * L_SUBFR);
 
-    test();test();move16();
+    
     if (sub(gain_pit, pitch_0_6) < 0)
         state = 0;
     else if (sub(gain_pit, pitch_0_9) < 0)
@@ -84,14 +84,14 @@ void Phase_dispersion(
 
     for (i = 5; i > 0; i--)
     {
-        prev_gain_pit[i] = prev_gain_pit[i - 1];        move16();
+        prev_gain_pit[i] = prev_gain_pit[i - 1];        
     }
-    prev_gain_pit[0] = gain_pit;           move16();
+    prev_gain_pit[0] = gain_pit;           
 
     if (sub(sub(gain_code, *prev_gain_code), shl(*prev_gain_code, 1)) > 0)
     {
         /* onset */
-        test();
+        
         if (sub(state, 2) < 0)
             state = add(state, 1);
     } else
@@ -99,21 +99,21 @@ void Phase_dispersion(
         j = 0;
         for (i = 0; i < 6; i++)
         {
-            test();
+            
             if (sub(prev_gain_pit[i], pitch_0_6) < 0)
                 j = add(j, 1);
         }
-        test();
+        
         if (sub(j, 2) > 0)
         {
-            state = 0;                     move16();
+            state = 0;                     
         }
         if (sub(sub(state, *prev_state), 1) > 0)
             state = sub(state, 1);
     }
 
-    *prev_gain_code = gain_code;           move16();
-    *prev_state = state;                   move16();
+    *prev_gain_code = gain_code;           
+    *prev_state = state;                   
 
     /* circular convolution */
 
@@ -123,12 +123,12 @@ void Phase_dispersion(
     {
         for (i = 0; i < L_SUBFR; i++)
         {
-            test();
+            
             if (code[i] != 0)
             {
                 for (j = 0; j < L_SUBFR; j++)
                 {
-                    move16();
+                    
                     code2[i + j] = add(code2[i + j], mult_r(code[i], ph_imp_low[j]));
                 }
             }
@@ -137,12 +137,12 @@ void Phase_dispersion(
     {
         for (i = 0; i < L_SUBFR; i++)
         {
-            test();
+            
             if (code[i] != 0)
             {
                 for (j = 0; j < L_SUBFR; j++)
                 {
-                    move16();
+                    
                     code2[i + j] = add(code2[i + j], mult_r(code[i], ph_imp_mid[j]));
                 }
             }
@@ -152,7 +152,7 @@ void Phase_dispersion(
     {
         for (i = 0; i < L_SUBFR; i++)
         {
-            move16();
+            
             code[i] = add(code2[i], code2[i + L_SUBFR]);
         }
     }

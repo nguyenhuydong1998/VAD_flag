@@ -37,26 +37,26 @@ void Init_D_gain2(
     Word16 i;
 
     /* 4nd order quantizer energy predictor (init to -14.0 in Q10) */
-    mem[0] = -14336;                       move16();  /* past_qua_en[0] */
-    mem[1] = -14336;                       move16();  /* past_qua_en[1] */
-    mem[2] = -14336;                       move16();  /* past_qua_en[2] */
-    mem[3] = -14336;                       move16();  /* past_qua_en[3] */
+    mem[0] = -14336;                         /* past_qua_en[0] */
+    mem[1] = -14336;                         /* past_qua_en[1] */
+    mem[2] = -14336;                         /* past_qua_en[2] */
+    mem[3] = -14336;                         /* past_qua_en[3] */
 
-    mem[4] = 0;                            move16();  /* *past_gain_pit  */
-    mem[5] = 0;                            move16();  /* *past_gain_code */
-    mem[6] = 0;                            move16();  /* *prev_gc */
+    mem[4] = 0;                              /* *past_gain_pit  */
+    mem[5] = 0;                              /* *past_gain_code */
+    mem[6] = 0;                              /* *prev_gc */
 
     for (i = 0; i < 5; i++)
     {
-        mem[i + 7] = 0;                    move16();  /* pbuf[i] */
+        mem[i + 7] = 0;                      /* pbuf[i] */
     }
     for (i = 0; i < 5; i++)
     {
-        mem[i + 12] = 0;                   move16();  /* gbuf[i] */
+        mem[i + 12] = 0;                     /* gbuf[i] */
     }
     for (i = 0; i < 5; i++)
     {
-        mem[i + 17] = 0;                   move16();  /* pbuf2[i] */
+        mem[i + 17] = 0;                     /* pbuf2[i] */
     }
     mem[22] = 21845;                       /* seed */
 
@@ -85,14 +85,14 @@ void D_gain2(
     Word16 g_code;
     Word32 L_tmp;
 
-    past_qua_en = mem;                     move16();
-    past_gain_pit = mem + 4;               move16();
-    past_gain_code = mem + 5;              move16();
-    prev_gc = mem + 6;                     move16();
-    pbuf = mem + 7;                        move16();
-    gbuf = mem + 12;                       move16();
-    pbuf2 = mem + 17;                      move16();
-    seed = mem + 22;                       move16();
+    past_qua_en = mem;                     
+    past_gain_pit = mem + 4;               
+    past_gain_code = mem + 5;              
+    prev_gc = mem + 6;                     
+    pbuf = mem + 7;                        
+    gbuf = mem + 12;                       
+    pbuf2 = mem + 17;                      
+    seed = mem + 22;                       
 
     /*-----------------------------------------------------------------*
      *  Find energy of code and compute:                               *
@@ -110,39 +110,39 @@ void D_gain2(
     /*-------------------------------*
      * Case of erasure.              *
      *-------------------------------*/
-    test();
+    
     if (bfi != 0)
     {
         tmp = median5(&pbuf[2]);
-        *past_gain_pit = tmp;              move16();
-        test();move16();
+        *past_gain_pit = tmp;              
+        
         if (sub(*past_gain_pit, 15565) > 0)
         {
             *past_gain_pit = 15565;        /* 0.95 in Q14 */
-            move16();
+            
         }
-        test();
+        
         if (unusable_frame != 0)
         {
-            *gain_pit = mult(pdown_unusable[state], *past_gain_pit);    move16();
+            *gain_pit = mult(pdown_unusable[state], *past_gain_pit);    
         } else
         {
-            *gain_pit = mult(pdown_usable[state], *past_gain_pit);      move16();
+            *gain_pit = mult(pdown_usable[state], *past_gain_pit);      
         }
         tmp = median5(&gbuf[2]);
-        test();
+        
         if (sub(vad_hist, 2) > 0)
         {
-            *past_gain_code = tmp;         move16();
+            *past_gain_code = tmp;         
         } else
         {
-            test();
+            
             if (unusable_frame != 0)
             {
-                *past_gain_code = mult(cdown_unusable[state], tmp);     move16();
+                *past_gain_code = mult(cdown_unusable[state], tmp);     
             } else
             {
-                *past_gain_code = mult(cdown_usable[state], tmp);       move16();
+                *past_gain_code = mult(cdown_usable[state], tmp);       
             }
         }
 
@@ -155,30 +155,30 @@ void D_gain2(
         qua_ener = extract_h(L_tmp);
 
         qua_ener = sub(qua_ener, 3072);    /* -3 in Q10 */
-        test();
+        
         if (sub(qua_ener, -14336) < 0)
-            qua_ener = -14336;             move16();  /* -14 in Q10 */
+            qua_ener = -14336;               /* -14 in Q10 */
 
-        past_qua_en[3] = past_qua_en[2];   move16();
-        past_qua_en[2] = past_qua_en[1];   move16();
-        past_qua_en[1] = past_qua_en[0];   move16();
-        past_qua_en[0] = qua_ener;         move16();
-
-        for (i = 1; i < 5; i++)
-        {
-            gbuf[i - 1] = gbuf[i];         move16();
-        }
-        gbuf[4] = *past_gain_code;         move16();
+        past_qua_en[3] = past_qua_en[2];   
+        past_qua_en[2] = past_qua_en[1];   
+        past_qua_en[1] = past_qua_en[0];   
+        past_qua_en[0] = qua_ener;         
 
         for (i = 1; i < 5; i++)
         {
-            pbuf[i - 1] = pbuf[i];         move16();
+            gbuf[i - 1] = gbuf[i];         
         }
-        pbuf[4] = *past_gain_pit;          move16();
+        gbuf[4] = *past_gain_code;         
+
+        for (i = 1; i < 5; i++)
+        {
+            pbuf[i - 1] = pbuf[i];         
+        }
+        pbuf[4] = *past_gain_pit;          
 
         /* adjust gain according to energy of code */
         /* past_gain_code(Q3) * gcode_inov(Q12) => Q16 */
-        *gain_cod = L_mult(*past_gain_code, gcode_inov);        move32();
+        *gain_cod = L_mult(*past_gain_code, gcode_inov);        
 
         return;
     }
@@ -212,59 +212,59 @@ void D_gain2(
     exp_gcode0 = sub(exp_gcode0, 14);
 
     /* Read the quantized gains */
-    test();
+    
     if (sub(nbits, 6) == 0)
     {
-        p = &t_qua_gain6b[add(index, index)];   move16();
+        p = &t_qua_gain6b[add(index, index)];   
     } else
     {
-        p = &t_qua_gain7b[add(index, index)];   move16();
+        p = &t_qua_gain7b[add(index, index)];   
     }
-    *gain_pit = *p++;                      move16();  /* selected pitch gain in Q14 */
-    g_code = *p++;                         move16();  /* selected code gain in Q11  */
+    *gain_pit = *p++;                        /* selected pitch gain in Q14 */
+    g_code = *p++;                           /* selected code gain in Q11  */
 
     L_tmp = L_mult(g_code, gcode0);        /* Q11*Q0 -> Q12 */
     L_tmp = L_shl(L_tmp, add(exp_gcode0, 4));   /* Q12 -> Q16 */
 
-    *gain_cod = L_tmp;                     move16();  /* gain of code in Q16 */
-    test();
+    *gain_cod = L_tmp;                       /* gain of code in Q16 */
+    
     if ((sub(prev_bfi, 1) == 0))
     {
         L_tmp = L_mult(*prev_gc, 5120);    /* prev_gc(Q3) * 1.25(Q12) = Q16 */
         /* if((*gain_cod > ((*prev_gc) * 1.25)) && (*gain_cod > 100.0)) */
-        test();test();
+        
         if ((L_sub(*gain_cod, L_tmp) > 0) && (L_sub(*gain_cod, 6553600) > 0))
         {
-            *gain_cod = L_tmp;             move32();
+            *gain_cod = L_tmp;             
         }
     }
     /* keep past gain code in Q3 for frame erasure (can saturate) */
-    *past_gain_code = round(L_shl(*gain_cod, 3));       move16();
-    *past_gain_pit = *gain_pit;            move16();
+    *past_gain_code = round(L_shl(*gain_cod, 3));       
+    *past_gain_pit = *gain_pit;            
 
-    *prev_gc = *past_gain_code;            move16();
+    *prev_gc = *past_gain_code;            
     for (i = 1; i < 5; i++)
     {
-        gbuf[i - 1] = gbuf[i];             move16();
+        gbuf[i - 1] = gbuf[i];             
     }
-    gbuf[4] = *past_gain_code;             move16();
-
-    for (i = 1; i < 5; i++)
-    {
-        pbuf[i - 1] = pbuf[i];             move16();
-    }
-    pbuf[4] = *past_gain_pit;              move16();
+    gbuf[4] = *past_gain_code;             
 
     for (i = 1; i < 5; i++)
     {
-        pbuf2[i - 1] = pbuf2[i];           move16();
+        pbuf[i - 1] = pbuf[i];             
     }
-    pbuf2[4] = *past_gain_pit;             move16();
+    pbuf[4] = *past_gain_pit;              
+
+    for (i = 1; i < 5; i++)
+    {
+        pbuf2[i - 1] = pbuf2[i];           
+    }
+    pbuf2[4] = *past_gain_pit;             
 
     /* adjust gain according to energy of code */
     L_Extract(*gain_cod, &exp, &frac);
     L_tmp = Mpy_32_16(exp, frac, gcode_inov);
-    *gain_cod = L_shl(L_tmp, 3);           move32();  /* gcode_inov in Q12 */
+    *gain_cod = L_shl(L_tmp, 3);             /* gcode_inov in Q12 */
 
     /*---------------------------------------------------*
      * qua_ener = 20*log10(g_code)                       *
@@ -281,10 +281,10 @@ void D_gain2(
 
     /* update table of past quantized energies */
 
-    past_qua_en[3] = past_qua_en[2];       move16();
-    past_qua_en[2] = past_qua_en[1];       move16();
-    past_qua_en[1] = past_qua_en[0];       move16();
-    past_qua_en[0] = qua_ener;             move16();
+    past_qua_en[3] = past_qua_en[2];       
+    past_qua_en[2] = past_qua_en[1];       
+    past_qua_en[1] = past_qua_en[0];       
+    past_qua_en[0] = qua_ener;             
 
     return;
 }

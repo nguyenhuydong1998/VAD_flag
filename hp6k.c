@@ -49,15 +49,15 @@ void Filt_6k_7k(
 
     for (i = 0; i < lg; i++)
     {
-        x[i + L_FIR - 1] = shr(signal[i], 2);   move16();  /* gain of filter = 4 */
+        x[i + L_FIR - 1] = shr(signal[i], 2);     /* gain of filter = 4 */
     }
 
     for (i = 0; i < lg; i++)
     {
-        L_tmp = 0;                         move32();
+        L_tmp = 0;                         
         for (j = 0; j < L_FIR; j++)
             L_tmp = L_mac(L_tmp, x[i + j], fir_6k_7k[j]);
-        signal[i] = round(L_tmp);          move16();
+        signal[i] = round(L_tmp);          
     }
 
     Copy(x + lg, mem, L_FIR - 1);

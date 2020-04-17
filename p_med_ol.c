@@ -34,17 +34,17 @@ Word16 Pitch_med_ol(                       /* output: open loop pitch lag       
     Word32 max, R0, R1, R2;
 
     ww = &corrweight[198];
-    move16();
+    
     we = &corrweight[98 + L_max - L_0];
-    move16();
+    
 
-    max = MIN_32;                          move32();
-    Tm = 0;                                move16();
+    max = MIN_32;                          
+    Tm = 0;                                
     for (i = L_max; i > L_min; i--)
     {
         /* Compute the correlation */
 
-        R0 = 0;                            move32();
+        R0 = 0;                            
         for (j = 0; j < L_frame; j++)
             R0 = L_mac(R0, wsp[j], wsp[j - i]);
 
@@ -54,36 +54,36 @@ Word16 Pitch_med_ol(                       /* output: open loop pitch lag       
         R0 = Mpy_32_16(hi, lo, *ww);
         ww--;
 
-        test();
-        test();
+        
+        
         if ((L_0 > 0) && (wght_flg > 0))
         {
             /* Weight the neighbourhood of the old lag. */
             L_Extract(R0, &hi, &lo);
             R0 = Mpy_32_16(hi, lo, *we);
             we--;
-            move16();
+            
         }
-        test();
+        
         if (L_sub(R0, max) >= 0)
         {
             max = R0;
-            move32();
+            
             Tm = i;
-            move16();
+            
         }
     }
 
     /* Hypass the wsp[] vector */
 
-    hp_wsp = old_hp_wsp + L_max;           move16();
+    hp_wsp = old_hp_wsp + L_max;           
     Hp_wsp(wsp, hp_wsp, L_frame, hp_wsp_mem);
 
     /* Compute normalize correlation at delay Tm */
 
-    R0 = 0;                                move32();
-    R1 = 1L;                               move32();
-    R2 = 1L;                               move32();
+    R0 = 0;                                
+    R1 = 1L;                               
+    R2 = 1L;                               
     for (j = 0; j < L_frame; j++)
     {
         R0 = L_mac(R0, hp_wsp[j], hp_wsp[j - Tm]);
@@ -119,14 +119,14 @@ Word16 Pitch_med_ol(                       /* output: open loop pitch lag       
     exp_R0 = add(exp_R0, exp_R1);
 
     *gain = round(L_shl(R0, exp_R0));
-    move16();
+    
 
     /* Shitf hp_wsp[] for next frame */
 
     for (i = 0; i < L_max; i++)
     {
         old_hp_wsp[i] = old_hp_wsp[i + L_frame];
-        move16();
+        
     }
 
     return (Tm);
@@ -153,59 +153,59 @@ Word16 median5(Word16 x[])
     Word16 x1, x2, x3, x4, x5;
     Word16 tmp;
 
-    x1 = x[-2];                            move16();
-    x2 = x[-1];                            move16();
-    x3 = x[0];                             move16();
-    x4 = x[1];                             move16();
-    x5 = x[2];                             move16();
+    x1 = x[-2];                            
+    x2 = x[-1];                            
+    x3 = x[0];                             
+    x4 = x[1];                             
+    x5 = x[2];                             
 
-    test();test();test();test();test();test();test();test();test();
+    
 
     if (sub(x2, x1) < 0)
     {
         tmp = x1;
         x1 = x2;
-        x2 = tmp;                          move16();move16();move16();
+        x2 = tmp;                          
     }
     if (sub(x3, x1) < 0)
     {
         tmp = x1;
         x1 = x3;
-        x3 = tmp;                          move16();move16();move16();
+        x3 = tmp;                          
     }
     if (sub(x4, x1) < 0)
     {
         tmp = x1;
         x1 = x4;
-        x4 = tmp;                          move16();move16();move16();
+        x4 = tmp;                          
     }
     if (sub(x5, x1) < 0)
     {
-        x5 = x1;                           move16();
+        x5 = x1;                           
     }
     if (sub(x3, x2) < 0)
     {
         tmp = x2;
         x2 = x3;
-        x3 = tmp;                          move16();move16();move16();
+        x3 = tmp;                          
     }
     if (sub(x4, x2) < 0)
     {
         tmp = x2;
         x2 = x4;
-        x4 = tmp;                          move16();move16();move16();
+        x4 = tmp;                          
     }
     if (sub(x5, x2) < 0)
     {
-        x5 = x2;                           move16();
+        x5 = x2;                           
     }
     if (sub(x4, x3) < 0)
     {
-        x3 = x4;                           move16();
+        x3 = x4;                           
     }
     if (sub(x5, x3) < 0)
     {
-        x3 = x5;                           move16();
+        x3 = x5;                           
     }
     return (x3);
 }
@@ -231,10 +231,10 @@ Word16 Med_olag(                           /* output : median of  5 previous ope
 
     for (i = 4; i > 0; i--)
     {
-        old_ol_lag[i] = old_ol_lag[i - 1]; move16();
+        old_ol_lag[i] = old_ol_lag[i - 1]; 
     }
 
-    old_ol_lag[0] = prev_ol_lag;           move16();
+    old_ol_lag[0] = prev_ol_lag;           
 
     i = median5(&old_ol_lag[2]);
 

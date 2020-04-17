@@ -60,7 +60,7 @@ void scale_mem_Hp_wsp(Word16 mem[], Word16 exp)
     {
         L_tmp = L_deposit_h(mem[i]);       /* x[i] */
         L_tmp = L_shl(L_tmp, exp);
-        mem[i] = round(L_tmp);             move16();
+        mem[i] = round(L_tmp);             
     }
 
     return;
@@ -79,27 +79,27 @@ void Hp_wsp(
     Word16 y3_hi, y3_lo, y2_hi, y2_lo, y1_hi, y1_lo;
     Word32 L_tmp;
 
-    y3_hi = mem[0];                        move16();
-    y3_lo = mem[1];                        move16();
-    y2_hi = mem[2];                        move16();
-    y2_lo = mem[3];                        move16();
-    y1_hi = mem[4];                        move16();
-    y1_lo = mem[5];                        move16();
-    x0 = mem[6];                           move16();
-    x1 = mem[7];                           move16();
-    x2 = mem[8];                           move16();
+    y3_hi = mem[0];                        
+    y3_lo = mem[1];                        
+    y2_hi = mem[2];                        
+    y2_lo = mem[3];                        
+    y1_hi = mem[4];                        
+    y1_lo = mem[5];                        
+    x0 = mem[6];                           
+    x1 = mem[7];                           
+    x2 = mem[8];                           
 
     for (i = 0; i < lg; i++)
     {
-        x3 = x2;                           move16();
-        x2 = x1;                           move16();
-        x1 = x0;                           move16();
-        x0 = wsp[i];                       move16();
+        x3 = x2;                           
+        x2 = x1;                           
+        x1 = x0;                           
+        x0 = wsp[i];                       
 
         /* y[i] = b[0]*x[i] + b[1]*x[i-1] + b140[2]*x[i-2] + b[3]*x[i-3]  */
         /* + a[1]*y[i-1] + a[2] * y[i-2]  + a[3]*y[i-3]  */
 
-        move32();
+        
         L_tmp = 16384L;                    /* rounding to maximise precision */
         L_tmp = L_mac(L_tmp, y1_lo, a[1]);
         L_tmp = L_mac(L_tmp, y2_lo, a[2]);
@@ -115,25 +115,25 @@ void Hp_wsp(
 
         L_tmp = L_shl(L_tmp, 2);           /* coeff Q12 --> Q15 */
 
-        y3_hi = y2_hi;                     move16();
-        y3_lo = y2_lo;                     move16();
-        y2_hi = y1_hi;                     move16();
-        y2_lo = y1_lo;                     move16();
+        y3_hi = y2_hi;                     
+        y3_lo = y2_lo;                     
+        y2_hi = y1_hi;                     
+        y2_lo = y1_lo;                     
         L_Extract(L_tmp, &y1_hi, &y1_lo);
 
         L_tmp = L_shl(L_tmp, 1);           /* coeff Q14 --> Q15 */
-        hp_wsp[i] = round(L_tmp);          move16();
+        hp_wsp[i] = round(L_tmp);          
     }
 
-    mem[0] = y3_hi;                        move16();
-    mem[1] = y3_lo;                        move16();
-    mem[2] = y2_hi;                        move16();
-    mem[3] = y2_lo;                        move16();
-    mem[4] = y1_hi;                        move16();
-    mem[5] = y1_lo;                        move16();
-    mem[6] = x0;                           move16();
-    mem[7] = x1;                           move16();
-    mem[8] = x2;                           move16();
+    mem[0] = y3_hi;                        
+    mem[1] = y3_lo;                        
+    mem[2] = y2_hi;                        
+    mem[3] = y2_lo;                        
+    mem[4] = y1_hi;                        
+    mem[5] = y1_lo;                        
+    mem[6] = x0;                           
+    mem[7] = x1;                           
+    mem[8] = x2;                           
 
     return;
 }

@@ -62,7 +62,7 @@ Word16 dtx_enc_init(dtx_encState ** st, Word16 isf_init[])
 {
     dtx_encState *s;
 
-    test();
+    
     if (st == (dtx_encState **) NULL)
     {
         fprintf(stderr, "dtx_enc_init: invalid parameter\n");
@@ -71,7 +71,7 @@ Word16 dtx_enc_init(dtx_encState ** st, Word16 isf_init[])
     *st = NULL;
 
     /* allocate memory */
-    test();
+    
     if ((s = (dtx_encState *) malloc(sizeof(dtx_encState))) == NULL)
     {
         fprintf(stderr, "dtx_enc_init: can not malloc state structure\n");
@@ -94,36 +94,36 @@ Word16 dtx_enc_reset(dtx_encState * st, Word16 isf_init[])
 {
     Word16 i;
 
-    test();
+    
     if (st == (dtx_encState *) NULL)
     {
         fprintf(stderr, "dtx_enc_reset: invalid parameter\n");
         return -1;
     }
-    st->hist_ptr = 0;                      move16();
-    st->log_en_index = 0;                  move16();
+    st->hist_ptr = 0;                      
+    st->log_en_index = 0;                  
 
     /* Init isf_hist[] */
     for (i = 0; i < DTX_HIST_SIZE; i++)
     {
         Copy(isf_init, &st->isf_hist[i * M], M);
     }
-    st->cng_seed = RANDOM_INITSEED;        move16();
+    st->cng_seed = RANDOM_INITSEED;        
 
     /* Reset energy history */
     Set_zero(st->log_en_hist, DTX_HIST_SIZE);
 
-    st->dtxHangoverCount = DTX_HANG_CONST; move16();
-    st->decAnaElapsedCount = 32767;        move16();
+    st->dtxHangoverCount = DTX_HANG_CONST; 
+    st->decAnaElapsedCount = 32767;        
 
     for (i = 0; i < 28; i++)
     {
-        st->D[i] = 0;                      move16();
+        st->D[i] = 0;                      
     }
 
     for (i = 0; i < DTX_HIST_SIZE - 1; i++)
     {
-        st->sumD[i] = 0;                   move32();
+        st->sumD[i] = 0;                   
     }
 
     return 1;
@@ -138,7 +138,7 @@ Word16 dtx_enc_reset(dtx_encState * st, Word16 isf_init[])
  **************************************************************************/
 void dtx_enc_exit(dtx_encState ** st)
 {
-    test();
+    
     if (st == NULL || *st == NULL)
         return;
 
@@ -174,11 +174,11 @@ Word16 dtx_enc(
 
     /* VOX mode computation of SID parameters */
     log_en = 0;
-    move16();
+    
     for (i = 0; i < M; i++)
     {
         L_isf[i] = 0;
-        move32();
+        
     }
     /* average energy and isf */
     for (i = 0; i < DTX_HIST_SIZE; i++)
@@ -192,7 +192,7 @@ Word16 dtx_enc(
 
     for (j = 0; j < M; j++)
     {
-        isf[j] = extract_l(L_shr(L_isf[j], 3)); move16();  /* divide by 8 */
+        isf[j] = extract_l(L_shr(L_isf[j], 3));   /* divide by 8 */
     }
 
     /* quantize logarithmic energy to 6 bits (-6 : 66 dB) which corresponds to -2:22 in log2(E).  */
@@ -210,17 +210,17 @@ Word16 dtx_enc(
     /* Quantize Energy */
     st->log_en_index = shr(log_en, 6);
 
-    test();
+    
     if (sub(st->log_en_index, 63) > 0)
     {
         st->log_en_index = 63;
-        move16();
+        
     }
-    test();
+    
     if (st->log_en_index < 0)
     {
         st->log_en_index = 0;
-        move16();
+        
     }
     /* Quantize ISFs */
     Qisf_ns(isf, isf, indice);
@@ -249,7 +249,7 @@ Word16 dtx_enc(
     log_en_int_e = shr(log_en, 10);
 
     /* Find fractional part */
-    log_en_int_m = (Word16) (log_en & 0x3ff);   logic16();
+    log_en_int_m = (Word16) (log_en & 0x3ff);   
     log_en_int_m = shl(log_en_int_m, 5);
 
     /* Subtract 2 from log_en in Q9, i.e divide the gain by 2 (energy by 4) */
@@ -265,7 +265,7 @@ Word16 dtx_enc(
     /* generate white noise vector */
     for (i = 0; i < L_FRAME; i++)
     {
-        exc2[i] = shr(Random(&(st->cng_seed)), 4);      move16();
+        exc2[i] = shr(Random(&(st->cng_seed)), 4);      
     }
 
     /* gain = level / sqrt(ener) * sqrt(L_FRAME) */
@@ -287,7 +287,7 @@ Word16 dtx_enc(
     for (i = 0; i < L_FRAME; i++)
     {
         tmp = mult(exc2[i], gain);         /* Q0 * Q15 */
-        exc2[i] = shl(tmp, exp);           move16();
+        exc2[i] = shl(tmp, exp);           
     }
 
     return 0;
@@ -312,12 +312,12 @@ Word16 dtx_buffer(
     Word16 log_en_e;
     Word16 log_en_m;
 
-    st->hist_ptr = add(st->hist_ptr, 1);   move16();
-    test();
+    st->hist_ptr = add(st->hist_ptr, 1);   
+    
     if (sub(st->hist_ptr, DTX_HIST_SIZE) == 0)
     {
         st->hist_ptr = 0;
-        move16();
+        
     }
     /* copy lsp vector into buffer */
     Copy(isf_new, &st->isf_hist[st->hist_ptr * M], M);
@@ -341,7 +341,7 @@ Word16 dtx_buffer(
     log_en = sub(log_en, add(1024, en_adjust[codec_mode]));
 
     /* Insert into the buffer */
-    st->log_en_hist[st->hist_ptr] = log_en;move16();
+    st->log_en_hist[st->hist_ptr] = log_en;
     return 0;
 }
 
@@ -360,29 +360,29 @@ void tx_dtx_handler(dtx_encState * st,     /* i/o : State struct           */
 {
 
     /* this state machine is in synch with the GSMEFR txDtx machine      */
-    st->decAnaElapsedCount = add(st->decAnaElapsedCount, 1);    move16();
+    st->decAnaElapsedCount = add(st->decAnaElapsedCount, 1);    
 
-    test();
+    
     if (vad_flag != 0)
     {
-        st->dtxHangoverCount = DTX_HANG_CONST;  move16();
+        st->dtxHangoverCount = DTX_HANG_CONST;  
     } else
     {                                      /* non-speech */
-        test();
+        
         if (st->dtxHangoverCount == 0)
         {                                  /* out of decoder analysis hangover  */
-            st->decAnaElapsedCount = 0;    move16();
-            *usedMode = MRDTX;             move16();
+            st->decAnaElapsedCount = 0;    
+            *usedMode = MRDTX;             
         } else
         {                                  /* in possible analysis hangover */
-            st->dtxHangoverCount = sub(st->dtxHangoverCount, 1);        move16();
+            st->dtxHangoverCount = sub(st->dtxHangoverCount, 1);        
 
             /* decAnaElapsedCount + dtxHangoverCount < DTX_ELAPSED_FRAMES_THRESH */
-            test();
+            
             if (sub(add(st->decAnaElapsedCount, st->dtxHangoverCount),
                     DTX_ELAPSED_FRAMES_THRESH) < 0)
             {
-                *usedMode = MRDTX;         move16();
+                *usedMode = MRDTX;         
                 /* if short time since decoder update, do not add extra HO */
             }
             /* else override VAD and stay in speech mode *usedMode and add extra hangover */
@@ -403,7 +403,7 @@ Word16 dtx_dec_init(dtx_decState ** st, Word16 isf_init[])
 {
     dtx_decState *s;
 
-    test();
+    
     if (st == (dtx_decState **) NULL)
     {
         fprintf(stderr, "dtx_dec_init: invalid parameter\n");
@@ -412,7 +412,7 @@ Word16 dtx_dec_init(dtx_decState ** st, Word16 isf_init[])
     *st = NULL;
 
     /* allocate memory */
-    test();
+    
     if ((s = (dtx_decState *) malloc(sizeof(dtx_decState))) == NULL)
     {
         fprintf(stderr, "dtx_dec_init: can not malloc state structure\n");
@@ -435,22 +435,22 @@ Word16 dtx_dec_reset(dtx_decState * st, Word16 isf_init[])
 {
     Word16 i;
 
-    test();
+    
     if (st == (dtx_decState *) NULL)
     {
         fprintf(stderr, "dtx_dec_reset: invalid parameter\n");
         return -1;
     }
-    st->since_last_sid = 0;                move16();
-    st->true_sid_period_inv = (1 << 13);   move16();  /* 0.25 in Q15 */
+    st->since_last_sid = 0;                
+    st->true_sid_period_inv = (1 << 13);     /* 0.25 in Q15 */
 
-    st->log_en = 3500;                     move16();
-    st->old_log_en = 3500;                 move16();
+    st->log_en = 3500;                     
+    st->old_log_en = 3500;                 
     /* low level noise for better performance in  DTX handover cases */
 
-    st->cng_seed = RANDOM_INITSEED;        move16();
+    st->cng_seed = RANDOM_INITSEED;        
 
-    st->hist_ptr = 0;                      move16();
+    st->hist_ptr = 0;                      
 
     /* Init isf_hist[] and decoder log frame energy */
     Copy(isf_init, st->isf, M);
@@ -459,20 +459,20 @@ Word16 dtx_dec_reset(dtx_decState * st, Word16 isf_init[])
     for (i = 0; i < DTX_HIST_SIZE; i++)
     {
         Copy(isf_init, &st->isf_hist[i * M], M);
-        st->log_en_hist[i] = (3500>>3);   move16();  /* scale down value in history properly by 2^3 */
+        st->log_en_hist[i] = (3500>>3);     /* scale down value in history properly by 2^3 */
     }
 
-    st->dtxHangoverCount = DTX_HANG_CONST; move16();
-    st->decAnaElapsedCount = 32767;        move16();
+    st->dtxHangoverCount = DTX_HANG_CONST; 
+    st->decAnaElapsedCount = 32767;        
 
-    st->sid_frame = 0;                     move16();
-    st->valid_data = 0;                    move16();
-    st->dtxHangoverAdded = 0;              move16();
+    st->sid_frame = 0;                     
+    st->valid_data = 0;                    
+    st->dtxHangoverAdded = 0;              
 
-    st->dtxGlobalState = SPEECH;           move16();
-    st->data_updated = 0;                  move16();
+    st->dtxGlobalState = SPEECH;           
+    st->data_updated = 0;                  
 
-    st->dither_seed = RANDOM_INITSEED;     move16();
+    st->dither_seed = RANDOM_INITSEED;     
     st->CN_dith = 0;
     st->dtx_vad_hist = 0;
 
@@ -488,7 +488,7 @@ Word16 dtx_dec_reset(dtx_decState * st, Word16 isf_init[])
  **************************************************************************/
 void dtx_dec_exit(dtx_decState ** st)
 {
-    test();
+    
     if (st == NULL || *st == NULL)
         return;
 
@@ -550,7 +550,7 @@ Word16 dtx_dec(
 
     /* This function is called if synthesis state is not SPEECH the globally passed  inputs to this function
      * are st->sid_frame st->valid_data st->dtxHangoverAdded new_state  (SPEECH, DTX, DTX_MUTE) */
-    test();test();
+    
     if ((st->dtxHangoverAdded != 0) &&
         (st->sid_frame != 0))
     {
@@ -559,127 +559,127 @@ Word16 dtx_dec(
 
         /* consider  twice the last frame */
         ptr = add(st->hist_ptr, 1);
-        test();
+        
         if (sub(ptr, DTX_HIST_SIZE) == 0)
-            ptr = 0;                       move16();
+            ptr = 0;                       
 
         Copy(&st->isf_hist[st->hist_ptr * M], &st->isf_hist[ptr * M], M);
 
-        st->log_en_hist[ptr] = st->log_en_hist[st->hist_ptr];   move16();
+        st->log_en_hist[ptr] = st->log_en_hist[st->hist_ptr];   
 
         /* compute mean log energy and isf from decoded signal (SID_FIRST) */
-        st->log_en = 0;                    move16();
+        st->log_en = 0;                    
         for (i = 0; i < M; i++)
         {
-            L_isf[i] = 0;                  move32();
+            L_isf[i] = 0;                  
         }
 
         /* average energy and isf */
         for (i = 0; i < DTX_HIST_SIZE; i++)
         {
             /* Division by DTX_HIST_SIZE = 8 has been done in dtx_buffer log_en is in Q10 */
-            st->log_en = add(st->log_en, st->log_en_hist[i]);   move16();
+            st->log_en = add(st->log_en, st->log_en_hist[i]);   
 
             for (j = 0; j < M; j++)
             {
-                L_isf[j] = L_add(L_isf[j], L_deposit_l(st->isf_hist[i * M + j]));       move32();
+                L_isf[j] = L_add(L_isf[j], L_deposit_l(st->isf_hist[i * M + j]));       
             }
         }
 
         /* st->log_en in Q9 */
-        st->log_en = shr(st->log_en, 1);   move16();
+        st->log_en = shr(st->log_en, 1);   
 
         /* Add 2 in Q9, in order to have only positive values for Pow2 */
         /* this value is subtracted back after Pow2 function */
-        st->log_en = add(st->log_en, 1024);move16();
-        test();
+        st->log_en = add(st->log_en, 1024);
+        
         if (st->log_en < 0)
-            st->log_en = 0;                move16();
+            st->log_en = 0;                
 
         for (j = 0; j < M; j++)
         {
-            st->isf[j] = extract_l(L_shr(L_isf[j], 3)); move32();  /* divide by 8 */
+            st->isf[j] = extract_l(L_shr(L_isf[j], 3));   /* divide by 8 */
         }
 
     }
-    test();
+    
     if (st->sid_frame != 0)
     {
         /* Set old SID parameters, always shift */
         /* even if there is no new valid_data   */
 
         Copy(st->isf, st->isf_old, M);
-        st->old_log_en = st->log_en;       move16();
-        test();
+        st->old_log_en = st->log_en;       
+        
         if (st->valid_data != 0)           /* new data available (no CRC) */
         {
             /* st->true_sid_period_inv = 1.0f/st->since_last_sid; */
             /* Compute interpolation factor, since the division only works * for values of since_last_sid <
              * 32 we have to limit the      * interpolation to 32 frames                                  */
-            tmp_int_length = st->since_last_sid;        move16();
+            tmp_int_length = st->since_last_sid;        
 
-            test();
+            
             if (sub(tmp_int_length, 32) > 0)
             {
-                tmp_int_length = 32;       move16();
+                tmp_int_length = 32;       
             }
-            test();
+            
             if (sub(tmp_int_length, 2) >= 0)
             {
-                move16();
+                
                 st->true_sid_period_inv = div_s(1 << 10, shl(tmp_int_length, 10));
             } else
             {
-                st->true_sid_period_inv = 1 << 14;      /* 0.5 it Q15 */move16();
+                st->true_sid_period_inv = 1 << 14;      /* 0.5 it Q15 */
             }
 
-            ind[0] = Serial_parm(6, prms); move16();
-            ind[1] = Serial_parm(6, prms); move16();
-            ind[2] = Serial_parm(6, prms); move16();
-            ind[3] = Serial_parm(5, prms); move16();
-            ind[4] = Serial_parm(5, prms); move16();
+            ind[0] = Serial_parm(6, prms); 
+            ind[1] = Serial_parm(6, prms); 
+            ind[2] = Serial_parm(6, prms); 
+            ind[3] = Serial_parm(5, prms); 
+            ind[4] = Serial_parm(5, prms); 
 
             Disf_ns(ind, st->isf);
 
             log_en_index = Serial_parm(6, prms);
 
             /* read background noise stationarity information */
-            st->CN_dith = Serial_parm(1, prms); move16();
+            st->CN_dith = Serial_parm(1, prms); 
 
             /* st->log_en = (float)log_en_index / 2.625 - 2.0;  */
             /* log2(E) in Q9 (log2(E) lies in between -2:22) */
-            st->log_en = shl(log_en_index, 15 - 6);     move16();
+            st->log_en = shl(log_en_index, 15 - 6);     
 
             /* Divide by 2.625  */
-            st->log_en = mult(st->log_en, 12483);       move16();
+            st->log_en = mult(st->log_en, 12483);       
             /* Subtract 2 in Q9 is done later, after Pow2 function  */
 
             /* no interpolation at startup after coder reset        */
             /* or when SID_UPD has been received right after SPEECH */
-            test();test();
+            
             if ((st->data_updated == 0) ||
                 (sub(st->dtxGlobalState, SPEECH) == 0))
             {
                 Copy(st->isf, st->isf_old, M);
-                st->old_log_en = st->log_en;    move16();
+                st->old_log_en = st->log_en;    
             }
         }                                  /* endif valid_data */
     }                                      /* endif sid_frame */
-    test();
-    test();
+    
+    
     if ((st->sid_frame != 0) && (st->valid_data != 0))
     {
-        st->since_last_sid = 0;            move16();
+        st->since_last_sid = 0;            
     }
     /* Interpolate SID info */
-    int_fac = shl(st->since_last_sid, 10); /* Q10 */move16();
+    int_fac = shl(st->since_last_sid, 10); /* Q10 */
     int_fac = mult(int_fac, st->true_sid_period_inv);   /* Q10 * Q15 -> Q10 */
 
     /* Maximize to 1.0 in Q10 */
-    test();
+    
     if (sub(int_fac, 1024) > 0)
     {
-        int_fac = 1024;                    move16();
+        int_fac = 1024;                    
     }
     int_fac = shl(int_fac, 4);             /* Q10 -> Q14 */
 
@@ -687,10 +687,10 @@ Word16 dtx_dec(
 
     for (i = 0; i < M; i++)
     {
-        isf[i] = mult(int_fac, st->isf[i]);/* Q14 * Q15 -> Q14 */move16();
+        isf[i] = mult(int_fac, st->isf[i]);/* Q14 * Q15 -> Q14 */
     }
 
-    int_fac = sub(16384, int_fac);         /* 1-k in Q14 */move16();
+    int_fac = sub(16384, int_fac);         /* 1-k in Q14 */
 
     /* ( Q14 * Q9 -> Q24 ) + Q24 -> Q24 */
     L_log_en_int = L_mac(L_log_en_int, int_fac, st->old_log_en);
@@ -698,8 +698,8 @@ Word16 dtx_dec(
     for (i = 0; i < M; i++)
     {
         /* Q14 + (Q14 * Q15 -> Q14) -> Q14 */
-        isf[i] = add(isf[i], mult(int_fac, st->isf_old[i]));    move16();
-        isf[i] = shl(isf[i], 1);           /* Q14 -> Q15 */move16();
+        isf[i] = add(isf[i], mult(int_fac, st->isf_old[i]));    
+        isf[i] = shl(isf[i], 1);           /* Q14 -> Q15 */
     }
 
     /* If background noise is non-stationary, insert comfort noise dithering */
@@ -731,7 +731,7 @@ Word16 dtx_dec(
     /* generate white noise vector */
     for (i = 0; i < L_FRAME; i++)
     {
-        exc2[i] = shr(Random(&(st->cng_seed)), 4);      move16();
+        exc2[i] = shr(Random(&(st->cng_seed)), 4);      
     }
 
     /* gain = level / sqrt(ener) * sqrt(L_FRAME) */
@@ -753,43 +753,43 @@ Word16 dtx_dec(
     for (i = 0; i < L_FRAME; i++)
     {
         tmp = mult(exc2[i], gain);         /* Q0 * Q15 */
-        exc2[i] = shl(tmp, exp);           move16();
+        exc2[i] = shl(tmp, exp);           
     }
 
-    test();
+    
     if (sub(new_state, DTX_MUTE) == 0)
     {
         /* mute comfort noise as it has been quite a long time since last SID update  was performed                            */
 
-        tmp_int_length = st->since_last_sid;    move16();
-        test();
+        tmp_int_length = st->since_last_sid;    
+        
         if (sub(tmp_int_length, 32) > 0)
         {
-            tmp_int_length = 32;           move16();
+            tmp_int_length = 32;           
         }
 
 		/* safety guard against division by zero */
-		test();
+		
 		if(tmp_int_length <= 0) {
-			tmp_int_length = 8;                                       move16();
+			tmp_int_length = 8;                                       
 		}
 
-		move16();
+		
         st->true_sid_period_inv = div_s(1 << 10, shl(tmp_int_length, 10));
 
-        st->since_last_sid = 0;            move16();
-        st->old_log_en = st->log_en;       move16();
+        st->since_last_sid = 0;            
+        st->old_log_en = st->log_en;       
         /* subtract 1/8 in Q9 (energy), i.e -3/8 dB */
-        st->log_en = sub(st->log_en, 64);  move16();
+        st->log_en = sub(st->log_en, 64);  
     }
     /* reset interpolation length timer if data has been updated.        */
-    test();test();test();test();
+    
     if ((st->sid_frame != 0) &&
         ((st->valid_data != 0) ||
             ((st->valid_data == 0) && (st->dtxHangoverAdded) != 0)))
     {
-        st->since_last_sid = 0;            move16();
-        st->data_updated = 1;              move16();
+        st->since_last_sid = 0;            
+        st->data_updated = 1;              
     }
     return 0;
 }
@@ -806,16 +806,16 @@ void dtx_dec_activity_update(
     Word16 log_en_e, log_en_m, log_en;
 
 
-    st->hist_ptr = add(st->hist_ptr, 1);   move16();
-    test();
+    st->hist_ptr = add(st->hist_ptr, 1);   
+    
     if (sub(st->hist_ptr, DTX_HIST_SIZE) == 0)
     {
-        st->hist_ptr = 0;                  move16();
+        st->hist_ptr = 0;                  
     }
     Copy(isf, &st->isf_hist[st->hist_ptr * M], M);
 
     /* compute log energy based on excitation frame energy in Q0 */
-    L_frame_en = 0;                        move32();
+    L_frame_en = 0;                        
     for (i = 0; i < L_FRAME; i++)
     {
         L_frame_en = L_mac(L_frame_en, exc[i], exc[i]);
@@ -833,7 +833,7 @@ void dtx_dec_activity_update(
     log_en = sub(log_en, 1024);
 
     /* insert into log energy buffer */
-    st->log_en_hist[st->hist_ptr] = log_en;move16();
+    st->log_en_hist[st->hist_ptr] = log_en;
 
     return;
 }
@@ -871,9 +871,9 @@ Word16 rx_dtx_handler(
     Word16 encState;
 
     /* DTX if SID frame or previously in DTX{_MUTE} and (NO_RX OR BAD_SPEECH) */
-    test();test();test();
-    test();test();test();
-    test();test();
+    
+    
+    
     if ((sub(frame_type, RX_SID_FIRST) == 0) ||
         (sub(frame_type, RX_SID_UPDATE) == 0) ||
         (sub(frame_type, RX_SID_BAD) == 0) ||
@@ -883,53 +883,53 @@ Word16 rx_dtx_handler(
                 (sub(frame_type, RX_SPEECH_BAD) == 0) ||
                 (sub(frame_type, RX_SPEECH_LOST) == 0))))
     {
-        newState = DTX;                    move16();
+        newState = DTX;                    
 
         /* stay in mute for these input types */
-        test();test();test();test();test();
+        
         if ((sub(st->dtxGlobalState, DTX_MUTE) == 0) &&
             ((sub(frame_type, RX_SID_BAD) == 0) ||
                 (sub(frame_type, RX_SID_FIRST) == 0) ||
                 (sub(frame_type, RX_SPEECH_LOST) == 0) ||
                 (sub(frame_type, RX_NO_DATA) == 0)))
         {
-            newState = DTX_MUTE;           move16();
+            newState = DTX_MUTE;           
         }
         /* evaluate if noise parameters are too old                     */
         /* since_last_sid is reset when CN parameters have been updated */
-        st->since_last_sid = add(st->since_last_sid, 1);        move16();
+        st->since_last_sid = add(st->since_last_sid, 1);        
 
         /* no update of sid parameters in DTX for a long while */
         /* Due to the delayed update of  st->since_last_sid counter
            SID_UPDATE frames need to be handled separately to avoid
            entering DTX_MUTE for late SID_UPDATE frames
         */
-        test(); test(); logic16();
+          
         if ((sub(frame_type, RX_SID_UPDATE) != 0) && 
 			(sub(st->since_last_sid, DTX_MAX_EMPTY_THRESH) > 0))
         {
-            newState = DTX_MUTE;           move16();
+            newState = DTX_MUTE;           
         }
     } else
     {
-        newState = SPEECH;                 move16();
-        st->since_last_sid = 0;            move16();
+        newState = SPEECH;                 
+        st->since_last_sid = 0;            
     }
 
     /* reset the decAnaElapsed Counter when receiving CNI data the first time, to robustify counter missmatch
      * after handover this might delay the bwd CNI analysis in the new decoder slightly. */
-    test();test();
+    
     if ((st->data_updated == 0) &&
         (sub(frame_type, RX_SID_UPDATE) == 0))
     {
-        st->decAnaElapsedCount = 0;        move16();
+        st->decAnaElapsedCount = 0;        
     }
     /* update the SPE-SPD DTX hangover synchronization */
     /* to know when SPE has added dtx hangover         */
-    st->decAnaElapsedCount = add(st->decAnaElapsedCount, 1);    move16();
-    st->dtxHangoverAdded = 0;              move16();
+    st->decAnaElapsedCount = add(st->decAnaElapsedCount, 1);    
+    st->dtxHangoverAdded = 0;              
 
-	test();test();test();test();test();logic16();
+	
 	if ((sub(frame_type, RX_SID_FIRST) == 0) ||
 		(sub(frame_type, RX_SID_UPDATE) == 0) ||
 		(sub(frame_type, RX_SID_BAD) == 0) ||
@@ -937,53 +937,53 @@ Word16 rx_dtx_handler(
 		((sub(st->dtxGlobalState, SPEECH) != 0) ||
 		(sub(st->dtx_vad_hist, DTX_HANG_CONST) >= 0))))
 	{
-		encState = DTX;                    move16();
+		encState = DTX;                    
 	} else
 	{
-		encState = SPEECH;                 move16();
+		encState = SPEECH;                 
 	}
 
-    test();
+    
     if (sub(encState, SPEECH) == 0)
     {
-        st->dtxHangoverCount = DTX_HANG_CONST;  move16();
+        st->dtxHangoverCount = DTX_HANG_CONST;  
     } else
     {
-        test();test();
+        
         if (sub(st->decAnaElapsedCount, DTX_ELAPSED_FRAMES_THRESH) > 0)
         {
-            st->dtxHangoverAdded = 1;      move16();
-            st->decAnaElapsedCount = 0;    move16();
-            st->dtxHangoverCount = 0;      move16();
+            st->dtxHangoverAdded = 1;      
+            st->decAnaElapsedCount = 0;    
+            st->dtxHangoverCount = 0;      
         } else if (test(), st->dtxHangoverCount == 0)
         {
-            st->decAnaElapsedCount = 0;    move16();
+            st->decAnaElapsedCount = 0;    
         } else
         {
-            st->dtxHangoverCount = sub(st->dtxHangoverCount, 1);        move16();
+            st->dtxHangoverCount = sub(st->dtxHangoverCount, 1);        
         }
     }
-    test();
+    
     if (sub(newState, SPEECH) != 0)
     {
         /* DTX or DTX_MUTE CN data is not in a first SID, first SIDs are marked as SID_BAD but will do
          * backwards analysis if a hangover period has been added according to the state machine above */
 
-        st->sid_frame = 0;                 move16();
-        st->valid_data = 0;                move16();
+        st->sid_frame = 0;                 
+        st->valid_data = 0;                
 
-        test();test();test();
+        
         if (sub(frame_type, RX_SID_FIRST) == 0)
         {
-            st->sid_frame = 1;             move16();
+            st->sid_frame = 1;             
         } else if (test(), sub(frame_type, RX_SID_UPDATE) == 0)
         {
-            st->sid_frame = 1;             move16();
-            st->valid_data = 1;            move16();
+            st->sid_frame = 1;             
+            st->valid_data = 1;            
         } else if (test(), sub(frame_type, RX_SID_BAD) == 0)
         {
-            st->sid_frame = 1;             move16();
-            st->dtxHangoverAdded = 0;      /* use old data */move16();
+            st->sid_frame = 1;             
+            st->dtxHangoverAdded = 0;      /* use old data */
         }
     }
     return newState;
@@ -1004,13 +1004,13 @@ static void aver_isf_history(
     /* the median ISF vector prior to the averaging               */
     for (k = 0; k < 2; k++)
     {
-        test();
+        
         if (add(indices[k], 1) != 0)
         {
             for (i = 0; i < M; i++)
             {
-                isf_tmp[k * M + i] = isf_old[indices[k] * M + i];       move16();
-                isf_old[indices[k] * M + i] = isf_old[indices[2] * M + i];      move16();
+                isf_tmp[k * M + i] = isf_old[indices[k] * M + i];       
+                isf_old[indices[k] * M + i] = isf_old[indices[2] * M + i];      
             }
         }
     }
@@ -1018,24 +1018,24 @@ static void aver_isf_history(
     /* Perform the ISF averaging */
     for (j = 0; j < M; j++)
     {
-        L_tmp = 0;                         move32();
+        L_tmp = 0;                         
 
         for (i = 0; i < DTX_HIST_SIZE; i++)
         {
             L_tmp = L_add(L_tmp, L_deposit_l(isf_old[i * M + j]));
         }
-        isf_aver[j] = L_tmp;               move32();
+        isf_aver[j] = L_tmp;               
     }
 
     /* Retrieve from isf_tmp[][] the ISF vectors saved prior to averaging */
     for (k = 0; k < 2; k++)
     {
-        test();
+        
         if (add(indices[k], 1) != 0)
         {
             for (i = 0; i < M; i++)
             {
-                isf_old[indices[k] * M + i] = isf_tmp[k * M + i];       move16();
+                isf_old[indices[k] * M + i] = isf_tmp[k * M + i];       
             }
         }
     }
@@ -1057,12 +1057,12 @@ static void find_frame_indices(
     /* sum sumD[0..DTX_HIST_SIZE-1]. sumD[DTX_HIST_SIZE] is    */
     /* not updated since it will be removed later.           */
 
-    tmp = DTX_HIST_SIZE_MIN_ONE;           move16();
-    j = -1;                                move16();
+    tmp = DTX_HIST_SIZE_MIN_ONE;           
+    j = -1;                                
     for (i = 0; i < DTX_HIST_SIZE_MIN_ONE; i++)
     {
         j = add(j, tmp);
-        st->sumD[i] = L_sub(st->sumD[i], st->D[j]);     move16();
+        st->sumD[i] = L_sub(st->sumD[i], st->D[j]);     
         tmp = sub(tmp, 1);
     }
 
@@ -1074,91 +1074,91 @@ static void find_frame_indices(
 
     for (i = DTX_HIST_SIZE_MIN_ONE; i > 0; i--)
     {
-        st->sumD[i] = st->sumD[i - 1];     move32();
+        st->sumD[i] = st->sumD[i - 1];     
     }
-    st->sumD[0] = 0;                       move32();
+    st->sumD[0] = 0;                       
 
     /* Remove the oldest frame from the distance matrix.           */
     /* Note that the distance matrix is replaced by a one-         */
     /* dimensional array to save static memory.                    */
 
-    tmp = 0;                               move16();
+    tmp = 0;                               
     for (i = 27; i >= 12; i = (Word16) (i - tmp))
     {
         tmp = add(tmp, 1);
         for (j = tmp; j > 0; j--)
         {
-            st->D[i - j + 1] = st->D[i - j - tmp];      move32();
+            st->D[i - j + 1] = st->D[i - j - tmp];      
         }
     }
 
     /* Compute the first column of the distance matrix D            */
     /* (squared Euclidean distances from isf1[] to isf_old_tx[][]). */
 
-    ptr = st->hist_ptr;                    move16();
+    ptr = st->hist_ptr;                    
     for (i = 1; i < DTX_HIST_SIZE; i++)
     {
         /* Compute the distance between the latest isf and the other isfs. */
         ptr = sub(ptr, 1);
-        test();
+        
         if (ptr < 0)
         {
-            ptr = DTX_HIST_SIZE_MIN_ONE;   move16();
+            ptr = DTX_HIST_SIZE_MIN_ONE;   
         }
-        L_tmp = 0;                         move32();
+        L_tmp = 0;                         
         for (j = 0; j < M; j++)
         {
             tmp = sub(isf_old_tx[st->hist_ptr * M + j], isf_old_tx[ptr * M + j]);
             L_tmp = L_mac(L_tmp, tmp, tmp);
         }
-        st->D[i - 1] = L_tmp;              move32();
+        st->D[i - 1] = L_tmp;              
 
         /* Update also the column sums. */
-        st->sumD[0] = L_add(st->sumD[0], st->D[i - 1]); move32();
-        st->sumD[i] = L_add(st->sumD[i], st->D[i - 1]); move32();
+        st->sumD[0] = L_add(st->sumD[0], st->D[i - 1]); 
+        st->sumD[i] = L_add(st->sumD[i], st->D[i - 1]); 
     }
 
     /* Find the minimum and maximum distances */
-    summax = st->sumD[0];                  move32();
-    summin = st->sumD[0];                  move32();
-    indices[0] = 0;                        move16();
-    indices[2] = 0;                        move16();
+    summax = st->sumD[0];                  
+    summin = st->sumD[0];                  
+    indices[0] = 0;                        
+    indices[2] = 0;                        
     for (i = 1; i < DTX_HIST_SIZE; i++)
     {
-        test();
+        
         if (L_sub(st->sumD[i], summax) > 0)
         {
-            indices[0] = i;                move16();
-            summax = st->sumD[i];          move32();
+            indices[0] = i;                
+            summax = st->sumD[i];          
         }
-        test();
+        
         if (L_sub(st->sumD[i], summin) < 0)
         {
-            indices[2] = i;                move16();
-            summin = st->sumD[i];          move32();
+            indices[2] = i;                
+            summin = st->sumD[i];          
         }
     }
 
     /* Find the second largest distance */
-    summax2nd = -2147483647L;              move32();
-    indices[1] = -1;                       move16();
+    summax2nd = -2147483647L;              
+    indices[1] = -1;                       
     for (i = 0; i < DTX_HIST_SIZE; i++)
     {
-        test();
+        
         if ((L_sub(st->sumD[i], summax2nd) > 0) && (sub(i, indices[0]) != 0))
         {
-            indices[1] = i;                move16();
-            summax2nd = st->sumD[i];       move32();
+            indices[1] = i;                
+            summax2nd = st->sumD[i];       
         }
     }
 
     for (i = 0; i < 3; i++)
     {
-        indices[i] = sub(st->hist_ptr, indices[i]);     move16();
-        test();
+        indices[i] = sub(st->hist_ptr, indices[i]);     
+        
         if (indices[i] < 0)
         {
-            indices[i] = add(indices[i], DTX_HIST_SIZE);        move16();
+            indices[i] = add(indices[i], DTX_HIST_SIZE);        
         }
     }
 
@@ -1168,20 +1168,20 @@ static void find_frame_indices(
     summax = L_shl(summax, tmp);
     summin = L_shl(summin, tmp);
     L_tmp = L_mult(round(summax), INV_MED_THRESH);
-    test();
+    
     if (L_sub(L_tmp, summin) <= 0)
     {
-        indices[0] = -1;                   move16();
+        indices[0] = -1;                   
     }
     /* If second largest distance/MED_THRESH is smaller than     */
     /* minimum distance then the median ISF vector replacement is    */
     /* not performed                                                 */
     summax2nd = L_shl(summax2nd, tmp);
     L_tmp = L_mult(round(summax2nd), INV_MED_THRESH);
-    test();
+    
     if (L_sub(L_tmp, summin) <= 0)
     {
-        indices[1] = -1;                   move16();
+        indices[1] = -1;                   
     }
     return;
 }
