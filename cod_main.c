@@ -14,15 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "typedef.h"
-#include "basic_op.h"
-#include "oper_32b.h"
-#include "math_op.h"
-#include "cnst.h"
-#include "acelp.h"
 #include "cod_main.h"
 #include "bits.h"
-#include "count.h"
 #include "main.h"
 
 
@@ -43,539 +36,10 @@ static Word16 isf_init[M] =
    9216, 10240, 11264, 12288, 13312, 14336, 15360, 3840
 };
 
-/* High Band encoding */
-static const Word16 HP_gain[16] =
-{
-   3624, 4673, 5597, 6479, 7425, 8378, 9324, 10264,
-   11210, 12206, 13391, 14844, 16770, 19655, 24289, 32728
-};
 
 
-/*-----------------------------------------------------------------*
- *   Funtion  init_coder                                           *
- *            ~~~~~~~~~~                                           *
- *   ->Initialization of variables for the coder section.          *
- *-----------------------------------------------------------------*/
 
-void Init_coder(void **spe_state)
-{
-    Coder_State *st;
 
-    *spe_state = NULL;
-
-    /*-------------------------------------------------------------------------*
-     * Memory allocation for coder state.                                      *
-     *-------------------------------------------------------------------------*/
-
-    if ((st = (Coder_State *) malloc(sizeof(Coder_State))) == NULL)
-    {
-        printf("Can not malloc Coder_State structure!\n");
-        return;
-    }
-    st->vadSt = NULL;                      
-    st->dtx_encSt = NULL;                  
-
-    wb_vad_init(&(st->vadSt));
-    dtx_enc_init(&(st->dtx_encSt), isf_init);
-
-    Reset_encoder((void *) st, 1);
-
-    *spe_state = (void *) st;
-
-    return;
-}
-
-
-void Reset_encoder(void *st, Word16 reset_all)
-{
-    Word16 i;
-
-    Coder_State *cod_state;
-
-    cod_state = (Coder_State *) st;
-
-    Set_zero(cod_state->old_exc, PIT_MAX + L_INTERPOL);
-    Set_zero(cod_state->mem_syn, M);
-    Set_zero(cod_state->past_isfq, M);
-
-    cod_state->mem_w0 = 0;                 
-    cod_state->tilt_code = 0;              
-    cod_state->first_frame = 1;            
-
-    Init_gp_clip(cod_state->gp_clip);
-
-    cod_state->L_gc_thres = 0;             
-
-    if (reset_all != 0)
-    {
-        /* Static vectors to zero */
-
-        Set_zero(cod_state->old_speech, L_TOTAL - L_FRAME);
-        Set_zero(cod_state->old_wsp, (PIT_MAX / OPL_DECIM));
-        Set_zero(cod_state->mem_decim2, 3);
-
-        /* routines initialization */
-
-        Init_Decim_12k8(cod_state->mem_decim);
-        Init_HP50_12k8(cod_state->mem_sig_in);
-        Init_Levinson(cod_state->mem_levinson);
-        Init_Q_gain2(cod_state->qua_gain);
-        Init_Hp_wsp(cod_state->hp_wsp_mem);
-
-        /* isp initialization */
-
-        Copy(isp_init, cod_state->ispold, M);
-        Copy(isp_init, cod_state->ispold_q, M);
-
-        /* variable initialization */
-
-        cod_state->mem_preemph = 0;        
-        cod_state->mem_wsp = 0;            
-        cod_state->Q_old = 15;             
-        cod_state->Q_max[0] = 15;          
-        cod_state->Q_max[1] = 15;          
-        cod_state->old_wsp_max = 0;        
-        cod_state->old_wsp_shift = 0;      
-
-        /* pitch ol initialization */
-
-        cod_state->old_T0_med = 40;        
-        cod_state->ol_gain = 0;            
-        cod_state->ada_w = 0;              
-        cod_state->ol_wght_flg = 0;        
-        for (i = 0; i < 5; i++)
-        {
-            cod_state->old_ol_lag[i] = 40; 
-        }
-        Set_zero(cod_state->old_hp_wsp, (L_FRAME / 2) / OPL_DECIM + (PIT_MAX / OPL_DECIM));
-
-        Set_zero(cod_state->mem_syn_hf, M);
-        Set_zero(cod_state->mem_syn_hi, M);
-        Set_zero(cod_state->mem_syn_lo, M);
-
-        Init_HP50_12k8(cod_state->mem_sig_out);
-        Init_Filt_6k_7k(cod_state->mem_hf);
-        Init_HP400_12k8(cod_state->mem_hp400);
-
-        Copy(isf_init, cod_state->isfold, M);
-
-        cod_state->mem_deemph = 0;         
-
-        cod_state->seed2 = 21845;          
-
-        Init_Filt_6k_7k(cod_state->mem_hf2);
-        cod_state->gain_alpha = 32767;     
-
-        cod_state->vad_hist = 0;
-
-        wb_vad_reset(cod_state->vadSt);
-        dtx_enc_reset(cod_state->dtx_encSt, isf_init);
-    }
-    return;
-}
-
-void Close_coder(void *spe_state)
-{
-    wb_vad_exit(&(((Coder_State *) spe_state)->vadSt));
-    dtx_enc_exit(&(((Coder_State *) spe_state)->dtx_encSt));
-    free(spe_state);
-
-    return;
-}
-
-/*-----------------------------------------------------------------*
- *   Funtion  coder                                                *
- *            ~~~~~                                                *
- *   ->Main coder routine.                                         *
- *                                                                 *
- *-----------------------------------------------------------------*/
-
-void coder(
-     Word16 speech16k[],                   /* input :  320 new speech samples (at 16 kHz)    */
-     Word16 * ser_size,                    /* output:  bit rate of the used mode             */
-     void *spe_state,                      /* i/o   :  State structure                       */
-     Word16 *flag_VAD					   /* VAD_flag										*/
-)
-{
-
-    /* Coder states */
-    Coder_State *st;
-
-    /* Speech vector */
-    Word16 old_speech[L_TOTAL];
-    Word16 *new_speech, *speech, *p_window;
-
-    /* Weighted speech vector */
-    Word16 old_wsp[L_FRAME + (PIT_MAX / OPL_DECIM)];
-    Word16 *wsp;
-
-    /* LPC coefficients */
-
-    Word16 r_h[M + 1], r_l[M + 1];         /* Autocorrelations of windowed speech  */
-    Word16 rc[M];                          /* Reflection coefficients.             */
-    Word16 Ap[M + 1];                      /* A(z) with spectral expansion         */
-    Word16 ispnew[M];                      /* immittance spectral pairs at 4nd sfr */
-    Word16 isf[M];                         /* ISF (frequency domain) at 4nd sfr    */
-    Word16 *p_A;                    /* ptr to A(z) for the 4 subframes      */
-    Word16 A[NB_SUBFR * (M + 1)];          /* A(z) unquantized for the 4 subframes */
-
-    /* Other vectors */
-
-    Word16 code[L_SUBFR];                  /* Fixed codebook excitation          */
-    Word16 error[M + L_SUBFR];             /* error of quantization              */
-    Word16 buf[L_FRAME];                   /* VAD buffer                         */
-
-    /* Scalars */
-
-    Word16 i, i_subfr, vad_flag;
-    Word16 T_op, T_op2;
-    Word16 tmp, exp, Q_new, mu, shift, max;
-
-    Word32 L_tmp, L_max;
-
-
-
-    st = (Coder_State *) spe_state;
-
-    *ser_size = nb_of_bits[0];         
-
-    /*--------------------------------------------------------------------------*
-     *          Initialize pointers to speech vector.                           *
-     *                                                                          *
-     *                                                                          *
-     *                    |-------|-------|-------|-------|-------|-------|     *
-     *                     past sp   sf1     sf2     sf3     sf4    L_NEXT      *
-     *                    <-------  Total speech buffer (L_TOTAL)   ------>     *
-     *              old_speech                                                  *
-     *                    <-------  LPC analysis window (L_WINDOW)  ------>     *
-     *                    |       <-- present frame (L_FRAME) ---->             *
-     *                   p_window |       <----- new speech (L_FRAME) ---->     *
-     *                            |       |                                     *
-     *                          speech    |                                     *
-     *                                 new_speech                               *
-     *--------------------------------------------------------------------------*/
-
-    new_speech = old_speech + L_TOTAL - L_FRAME - L_FILT;         /* New speech     */
-    speech = old_speech + L_TOTAL - L_FRAME - L_NEXT;     /* Present frame  */
-    p_window = old_speech + L_TOTAL - L_WINDOW; 
-
-    wsp = old_wsp + (PIT_MAX / OPL_DECIM); 
-
-    /* copy coder memory state into working space (internal memory for DSP) */
-
-    Copy(st->old_speech, old_speech, L_TOTAL - L_FRAME);
-    Copy(st->old_wsp, old_wsp, PIT_MAX / OPL_DECIM);
-
-    /*---------------------------------------------------------------*
-     * Down sampling signal from 16kHz to 12.8kHz                    *
-     * -> The signal is extended by L_FILT samples (padded to zero)  *
-     * to avoid additional delay (L_FILT samples) in the coder.      *
-     * The last L_FILT samples are approximated after decimation and *
-     * are used (and windowed) only in autocorrelations.             *
-     *---------------------------------------------------------------*/
-
-    Decim_12k8(speech16k, L_FRAME16k, new_speech, st->mem_decim);
-
-    /* last L_FILT samples for autocorrelation window */
-    Copy(st->mem_decim, code, 2 * L_FILT16k);
-    Set_zero(error, L_FILT16k);            /* set next sample to zero */
-    Decim_12k8(error, L_FILT16k, new_speech + L_FRAME, code);
-
-    /*---------------------------------------------------------------*
-     * Perform 50Hz HP filtering of input signal.                    *
-     *---------------------------------------------------------------*/
-
-    HP50_12k8(new_speech, L_FRAME, st->mem_sig_in);
-
-    /* last L_FILT samples for autocorrelation window */
-    Copy(st->mem_sig_in, code, 6);
-    HP50_12k8(new_speech + L_FRAME, L_FILT, code);
-
-    /*---------------------------------------------------------------*
-     * Perform fixed preemphasis through 1 - g z^-1                  *
-     * Scale signal to get maximum of precision in filtering         *
-     *---------------------------------------------------------------*/
-
-    mu = shr(PREEMPH_FAC, 1);              /* Q15 --> Q14 */
-
-    /* get max of new preemphased samples (L_FRAME+L_FILT) */
-
-    L_tmp = L_mult(new_speech[0], 16384);
-    L_tmp = L_msu(L_tmp, st->mem_preemph, mu);
-    L_max = L_abs(L_tmp);
-
-    for (i = 1; i < L_FRAME + L_FILT; i++)
-    {
-        L_tmp = L_mult(new_speech[i], 16384);
-        L_tmp = L_msu(L_tmp, new_speech[i - 1], mu);
-        L_tmp = L_abs(L_tmp);
-        
-        if (L_sub(L_tmp, L_max) > (Word32) 0)
-        {
-            L_max = L_tmp;                 
-        }
-    }
-
-    /* get scaling factor for new and previous samples */
-    /* limit scaling to Q_MAX to keep dynamic for ringing in low signal */
-    /* limit scaling to Q_MAX also to avoid a[0]<1 in syn_filt_32 */
-    tmp = extract_h(L_max);
-    
-    if (tmp == 0)
-    {
-        shift = Q_MAX;                     
-    } else
-    {
-        shift = sub(norm_s(tmp), 1);
-        
-        if (shift < 0)
-        {
-            shift = 0;                     
-        }
-        
-        if (sub(shift, Q_MAX) > 0)
-        {
-            shift = Q_MAX;                 
-        }
-    }
-    Q_new = shift;                         
-    
-    if (sub(Q_new, st->Q_max[0]) > 0)
-    {
-        Q_new = st->Q_max[0];              
-    }
-    
-    if (sub(Q_new, st->Q_max[1]) > 0)
-    {
-        Q_new = st->Q_max[1];              
-    }
-    exp = sub(Q_new, st->Q_old);
-    st->Q_old = Q_new;                     
-    st->Q_max[1] = st->Q_max[0];           
-    st->Q_max[0] = shift;                  
-
-    /* preemphasis with scaling (L_FRAME+L_FILT) */
-
-    tmp = new_speech[L_FRAME - 1];         
-
-    for (i = L_FRAME + L_FILT - 1; i > 0; i--)
-    {
-        L_tmp = L_mult(new_speech[i], 16384);
-        L_tmp = L_msu(L_tmp, new_speech[i - 1], mu);
-        L_tmp = L_shl(L_tmp, Q_new);
-        new_speech[i] = round(L_tmp);      
-    }
-
-    L_tmp = L_mult(new_speech[0], 16384);
-    L_tmp = L_msu(L_tmp, st->mem_preemph, mu);
-    L_tmp = L_shl(L_tmp, Q_new);
-    new_speech[0] = round(L_tmp);          
-
-    st->mem_preemph = tmp;                 
-
-    /* scale previous samples and memory */
-
-    Scale_sig(old_speech, L_TOTAL - L_FRAME - L_FILT, exp);
-    Scale_sig(st->mem_syn, M, exp);
-    Scale_sig(st->mem_decim2, 3, exp);
-    Scale_sig(&(st->mem_wsp), 1, exp);
-    Scale_sig(&(st->mem_w0), 1, exp);
-
-    /*------------------------------------------------------------------------*
-     *  Call VAD                                                              *
-     *  Preemphesis scale down signal in low frequency and keep dynamic in HF.*
-     *  Vad work slightly in futur (new_speech = speech + L_NEXT - L_FILT).   *
-     *------------------------------------------------------------------------*/
-
-    Copy(new_speech, buf, L_FRAME);
-
-    Scale_sig(buf, L_FRAME, sub(1, Q_new));
-
-    vad_flag = wb_vad(st->vadSt, buf);
-
-	/* Export flag_VAD */
-	if (vad_flag == 0)
-		{
-		*flag_VAD = 0; 		// 16 bit 0
-		}
-	else
-		{
-		*flag_VAD = -1;		// 16 bit 1   
-		}
-    if (vad_flag == 0)
-    {
-        st->vad_hist = add(st->vad_hist, 1);        
-    } else
-    {
-        st->vad_hist = 0;              
-    }
-
-    /*------------------------------------------------------------------------*
-     *  Perform LPC analysis                                                  *
-     *  ~~~~~~~~~~~~~~~~~~~~                                                  *
-     *   - autocorrelation + lag windowing                                    *
-     *   - Levinson-durbin algorithm to find a[]                              *
-     *   - convert a[] to isp[]                                               *
-     *   - convert isp[] to isf[] for quantization                            *
-     *   - quantize and code the isf[]                                        *
-     *   - convert isf[] to isp[] for interpolation                           *
-     *   - find the interpolated ISPs and convert to a[] for the 4 subframes  *
-     *------------------------------------------------------------------------*/
-
-    /* LP analysis centered at 4nd subframe */
-    Autocorr(p_window, M, r_h, r_l);       /* Autocorrelations */
-    Lag_window(r_h, r_l);                  /* Lag windowing    */
-    Levinson(r_h, r_l, A, rc, st->mem_levinson);        /* Levinson Durbin  */
-    Az_isp(A, ispnew, st->ispold);         /* From A(z) to ISP */
-
-    /* Find the interpolated ISPs and convert to a[] for all subframes */
-    Int_isp(st->ispold, ispnew, interpol_frac, A);
-
-    /* update ispold[] for the next frame */
-    Copy(ispnew, st->ispold, M);
-
-    /* Convert ISPs to frequency domain 0..6400 */
-    Isp_isf(ispnew, isf, M);
-
-
-    /*----------------------------------------------------------------------*
-     *  Perform PITCH_OL analysis                                           *
-     *  ~~~~~~~~~~~~~~~~~~~~~~~~~                                           *
-     * - Find the residual res[] for the whole speech frame                 *
-     * - Find the weighted input speech wsp[] for the whole speech frame    *
-     * - scale wsp[] to avoid overflow in pitch estimation                  *
-     * - Find open loop pitch lag for whole speech frame                    *
-     *----------------------------------------------------------------------*/
-
-    p_A = A;                               
-    for (i_subfr = 0; i_subfr < L_FRAME; i_subfr += L_SUBFR)
-    {
-        Weight_a(p_A, Ap, GAMMA1, M);
-        Residu(Ap, M, &speech[i_subfr], &wsp[i_subfr], L_SUBFR);
-        p_A += (M + 1);                    
-    }
-    Deemph2(wsp, TILT_FAC, L_FRAME, &(st->mem_wsp));
-
-    /* find maximum value on wsp[] for 12 bits scaling */
-    max = 0;                               
-    for (i = 0; i < L_FRAME; i++)
-    {
-        tmp = abs_s(wsp[i]);
-        
-        if (sub(tmp, max) > 0)
-        {
-            max = tmp;                     
-        }
-    }
-    tmp = st->old_wsp_max;                 
-    
-    if (sub(max, tmp) > 0)
-    {
-        tmp = max;                         /* tmp = max(wsp_max, old_wsp_max) */
-        
-    }
-    st->old_wsp_max = max;                 
-
-    shift = sub(norm_s(tmp), 3);
-    
-    if (shift > 0)
-    {
-        shift = 0;                         /* shift = 0..-3 */
-        
-    }
-    /* decimation of wsp[] to search pitch in LF and to reduce complexity */
-    LP_Decim2(wsp, L_FRAME, st->mem_decim2);
-
-    /* scale wsp[] in 12 bits to avoid overflow */
-    Scale_sig(wsp, L_FRAME / OPL_DECIM, shift);
-
-    /* scale old_wsp (warning: exp must be Q_new-Q_old) */
-    exp = add(exp, sub(shift, st->old_wsp_shift));
-    st->old_wsp_shift = shift;
-    Scale_sig(old_wsp, PIT_MAX / OPL_DECIM, exp);
-    Scale_sig(st->old_hp_wsp, PIT_MAX / OPL_DECIM, exp);
-    scale_mem_Hp_wsp(st->hp_wsp_mem, exp);
-
-    /* Find open loop pitch lag for whole speech frame */
-
-    
-    if (sub(*ser_size, NBBITS_7k) == 0)
-    {
-        /* Find open loop pitch lag for whole speech frame */
-        T_op = Pitch_med_ol(wsp, PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
-            L_FRAME / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
-    } else
-    {
-        /* Find open loop pitch lag for first 1/2 frame */
-        T_op = Pitch_med_ol(wsp, PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
-            (L_FRAME / 2) / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
-    }
-
-    
-    if (sub(st->ol_gain, 19661) > 0)       /* 0.6 in Q15 */
-    {
-        st->old_T0_med = Med_olag(T_op, st->old_ol_lag);        
-        st->ada_w = 32767;                 
-    } else
-    {
-        st->ada_w = mult(st->ada_w, 29491);
-    }
-
-    
-    if (sub(st->ada_w, 26214) < 0)
-        st->ol_wght_flg = 0;
-    else
-        st->ol_wght_flg = 1;
-
-    wb_vad_tone_detection(st->vadSt, st->ol_gain);
-
-    T_op *= OPL_DECIM;                     
-
-    
-    if (sub(*ser_size, NBBITS_7k) != 0)
-    {
-        /* Find open loop pitch lag for second 1/2 frame */
-        T_op2 = Pitch_med_ol(wsp + ((L_FRAME / 2) / OPL_DECIM), PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
-            (L_FRAME / 2) / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
-
-        
-        if (sub(st->ol_gain, 19661) > 0)   /* 0.6 in Q15 */
-        {
-            st->old_T0_med = Med_olag(T_op2, st->old_ol_lag);   
-            st->ada_w = 32767;             
-        } else
-        {
-            st->ada_w = mult(st->ada_w, 29491); 
-        }
-
-        
-        if (sub(st->ada_w, 26214) < 0)
-            st->ol_wght_flg = 0;
-        else
-            st->ol_wght_flg = 1;
-
-        wb_vad_tone_detection(st->vadSt, st->ol_gain);
-
-        T_op2 *= OPL_DECIM;                
-
-    } else
-    {
-        T_op2 = T_op;                      
-    }
-
-
-
-    /*--------------------------------------------------*
-     * Update signal for next frame.                    *
-     * -> save past of speech[] and wsp[].              *
-     *--------------------------------------------------*/
-
-    Copy(&old_speech[L_FRAME], st->old_speech, L_TOTAL - L_FRAME);
-    Copy(&old_wsp[L_FRAME / OPL_DECIM], st->old_wsp, PIT_MAX / OPL_DECIM);
-
-
-    return;
-}
 /*___________________________________________________________________________
  |                                                                           |
  | Basic arithmetic operators.                                               |
@@ -2153,91 +1617,211 @@ Word16 norm_l (Word32 L_var1)
     return (var_out);
 }
 
-
-/*___________________________________________________________________________
- |                                                                           |
- |  This file contains mathematic operations in fixed point.                 |
- |                                                                           |
- |  Isqrt()              : inverse square root (16 bits precision).          |
- |  Pow2()               : 2^x  (16 bits precision).                         |
- |  Log2()               : log2 (16 bits precision).                         |
- |  Dot_product()        : scalar product of <x[],y[]>                       |
- |                                                                           |
- |  These operations are not standard double precision operations.           |
- |  They are used where low complexity is important and the full 32 bits     |
- |  precision is not necessary. For example, the function Div_32() has a     |
- |  24 bits precision which is enough for our purposes.                      |
- |                                                                           |
- |  In this file, the values use theses representations:                     |
- |                                                                           |
- |  Word32 L_32     : standard signed 32 bits format                         |
- |  Word16 hi, lo   : L_32 = hi<<16 + lo<<1  (DPF - Double Precision Format) |
- |  Word32 frac, Word16 exp : L_32 = frac << exp-31  (normalised format)     |
- |  Word16 int, frac        : L_32 = int.frac        (fractional format)     |
- |___________________________________________________________________________|
+/*****************************************************************************
+ *  $Id$
+ *
+ *  This file contains operations in double precision.                       *
+ *  These operations are not standard double precision operations.           *
+ *  They are used where single precision is not enough but the full 32 bits  *
+ *  precision is not necessary. For example, the function Div_32() has a     *
+ *  24 bits precision which is enough for our purposes.                      *
+ *                                                                           *
+ *  The double precision numbers use a special representation:               *
+ *                                                                           *
+ *     L_32 = hi<<16 + lo<<1                                                 *
+ *                                                                           *
+ *  L_32 is a 32 bit integer.                                                *
+ *  hi and lo are 16 bit signed integers.                                    *
+ *  As the low part also contains the sign, this allows fast multiplication. *
+ *                                                                           *
+ *      0x8000 0000 <= L_32 <= 0x7fff fffe.                                  *
+ *                                                                           *
+ *  We will use DPF (Double Precision Format )in this file to specify        *
+ *  this special format.                                                     *
+ *****************************************************************************
 */
 
 
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Isqrt                                                   |
- |                                                                           |
- |       Compute 1/sqrt(L_x).                                                |
- |       if L_x is negative or zero, result is 1 (7fffffff).                 |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |   1- Normalization of L_x.                                                |
- |   2- call Isqrt_n(L_x, exponant)                                          |
- |   3- L_y = L_x << exponant                                                |
- |___________________________________________________________________________|
+/*****************************************************************************
+ *                                                                           *
+ *  Function L_Extract()                                                     *
+ *                                                                           *
+ *  Extract from a 32 bit integer two 16 bit DPF.                            *
+ *                                                                           *
+ *  Arguments:                                                               *
+ *                                                                           *
+ *   L_32      : 32 bit integer.                                             *
+ *               0x8000 0000 <= L_32 <= 0x7fff ffff.                         *
+ *   hi        : b16 to b31 of L_32                                          *
+ *   lo        : (L_32 - hi<<16)>>1                                          *
+ *****************************************************************************
 */
-Word32 Isqrt(                              /* (o) Q31 : output value (range: 0<=val<1)         */
-     Word32 L_x                            /* (i) Q0  : input value  (range: 0<=val<=7fffffff) */
-)
+
+void L_Extract (Word32 L_32, Word16 *hi, Word16 *lo)
 {
-    Word16 exp;
-    Word32 L_y;
-
-    exp = norm_l(L_x);
-    L_x = L_shl(L_x, exp);                 /* L_x is normalized */
-    exp = sub(31, exp);
-
-    Isqrt_n(&L_x, &exp);
-
-    L_y = L_shl(L_x, exp);                 /* denormalization   */
-
-    return (L_y);
+    *hi = extract_h (L_32);
+    *lo = extract_l (L_msu (L_shr (L_32, 1), *hi, 16384));
+    return;
 }
 
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Isqrt_n                                                 |
- |                                                                           |
- |       Compute 1/sqrt(value).                                              |
- |       if value is negative or zero, result is 1 (frac=7fffffff, exp=0).   |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |   The function 1/sqrt(value) is approximated by a table and linear        |
- |   interpolation.                                                          |
- |                                                                           |
- |   1- If exponant is odd then shift fraction right once.                   |
- |   2- exponant = -((exponant-1)>>1)                                        |
- |   3- i = bit25-b30 of fraction, 16 <= i <= 63 ->because of normalization. |
- |   4- a = bit10-b24                                                        |
- |   5- i -=16                                                               |
- |   6- fraction = table[i]<<16 - (table[i] - table[i+1]) * a * 2            |
- |___________________________________________________________________________|
+/*****************************************************************************
+ *                                                                           *
+ *  Function L_Comp()                                                        *
+ *                                                                           *
+ *  Compose from two 16 bit DPF a 32 bit integer.                            *
+ *                                                                           *
+ *     L_32 = hi<<16 + lo<<1                                                 *
+ *                                                                           *
+ *  Arguments:                                                               *
+ *                                                                           *
+ *   hi        msb                                                           *
+ *   lo        lsf (with sign)                                               *
+ *                                                                           *
+ *   Return Value :                                                          *
+ *                                                                           *
+ *             32 bit long signed integer (Word32) whose value falls in the  *
+ *             range : 0x8000 0000 <= L_32 <= 0x7fff fff0.                   *
+ *                                                                           *
+ *****************************************************************************
 */
-static Word16 table_isqrt[49] =
+
+Word32 L_Comp (Word16 hi, Word16 lo)
 {
-    32767, 31790, 30894, 30070, 29309, 28602, 27945, 27330, 26755, 26214,
-    25705, 25225, 24770, 24339, 23930, 23541, 23170, 22817, 22479, 22155,
-    21845, 21548, 21263, 20988, 20724, 20470, 20225, 19988, 19760, 19539,
-    19326, 19119, 18919, 18725, 18536, 18354, 18176, 18004, 17837, 17674,
-    17515, 17361, 17211, 17064, 16921, 16782, 16646, 16514, 16384
-};
+    Word32 L_32;
+
+    L_32 = L_deposit_h (hi);
+    return (L_mac (L_32, lo, 1));       /* = hi<<16 + lo<<1 */
+}
+
+/*****************************************************************************
+ * Function Mpy_32()                                                         *
+ *                                                                           *
+ *   Multiply two 32 bit integers (DPF). The result is divided by 2**31      *
+ *                                                                           *
+ *   L_32 = (hi1*hi2)<<1 + ( (hi1*lo2)>>15 + (lo1*hi2)>>15 )<<1              *
+ *                                                                           *
+ *   This operation can also be viewed as the multiplication of two Q31      *
+ *   number and the result is also in Q31.                                   *
+ *                                                                           *
+ * Arguments:                                                                *
+ *                                                                           *
+ *  hi1         hi part of first number                                      *
+ *  lo1         lo part of first number                                      *
+ *  hi2         hi part of second number                                     *
+ *  lo2         lo part of second number                                     *
+ *                                                                           *
+ *****************************************************************************
+*/
+
+Word32 Mpy_32 (Word16 hi1, Word16 lo1, Word16 hi2, Word16 lo2)
+{
+    Word32 L_32;
+
+    L_32 = L_mult (hi1, hi2);
+    L_32 = L_mac (L_32, mult (hi1, lo2), 1);
+    L_32 = L_mac (L_32, mult (lo1, hi2), 1);
+
+    return (L_32);
+}
+
+/*****************************************************************************
+ * Function Mpy_32_16()                                                      *
+ *                                                                           *
+ *   Multiply a 16 bit integer by a 32 bit (DPF). The result is divided      *
+ *   by 2**15                                                                *
+ *                                                                           *
+ *                                                                           *
+ *   L_32 = (hi1*lo2)<<1 + ((lo1*lo2)>>15)<<1                                *
+ *                                                                           *
+ * Arguments:                                                                *
+ *                                                                           *
+ *  hi          hi part of 32 bit number.                                    *
+ *  lo          lo part of 32 bit number.                                    *
+ *  n           16 bit number.                                               *
+ *                                                                           *
+ *****************************************************************************
+*/
+
+Word32 Mpy_32_16 (Word16 hi, Word16 lo, Word16 n)
+{
+    Word32 L_32;
+
+    L_32 = L_mult (hi, n);
+    L_32 = L_mac (L_32, mult (lo, n), 1);
+
+    return (L_32);
+}
+
+/*****************************************************************************
+ *                                                                           *
+ *   Function Name : Div_32                                                  *
+ *                                                                           *
+ *   Purpose :                                                               *
+ *             Fractional integer division of two 32 bit numbers.            *
+ *             L_num / L_denom.                                              *
+ *             L_num and L_denom must be positive and L_num < L_denom.       *
+ *             L_denom = denom_hi<<16 + denom_lo<<1                          *
+ *             denom_hi is a normalize number.                               *
+ *                                                                           *
+ *   Inputs :                                                                *
+ *                                                                           *
+ *    L_num                                                                  *
+ *             32 bit long signed integer (Word32) whose value falls in the  *
+ *             range : 0x0000 0000 < L_num < L_denom                         *
+ *                                                                           *
+ *    L_denom = denom_hi<<16 + denom_lo<<1      (DPF)                        *
+ *                                                                           *
+ *       denom_hi                                                            *
+ *             16 bit positive normalized integer whose value falls in the   *
+ *             range : 0x4000 < hi < 0x7fff                                  *
+ *       denom_lo                                                            *
+ *             16 bit positive integer whose value falls in the              *
+ *             range : 0 < lo < 0x7fff                                       *
+ *                                                                           *
+ *   Return Value :                                                          *
+ *                                                                           *
+ *    L_div                                                                  *
+ *             32 bit long signed integer (Word32) whose value falls in the  *
+ *             range : 0x0000 0000 <= L_div <= 0x7fff ffff.                  *
+ *                                                                           *
+ *  Algorithm:                                                               *
+ *                                                                           *
+ *  - find = 1/L_denom.                                                      *
+ *      First approximation: approx = 1 / denom_hi                           *
+ *      1/L_denom = approx * (2.0 - L_denom * approx )                       *
+ *                                                                           *
+ *  -  result = L_num * (1/L_denom)                                          *
+ *****************************************************************************
+*/
+
+Word32 Div_32 (Word32 L_num, Word16 denom_hi, Word16 denom_lo)
+{
+    Word16 approx, hi, lo, n_hi, n_lo;
+    Word32 L_32;
+
+    /* First approximation: 1 / L_denom = 1/denom_hi */
+
+    approx = div_s ((Word16) 0x3fff, denom_hi);
+
+    /* 1/L_denom = approx * (2.0 - L_denom * approx) */
+
+    L_32 = Mpy_32_16 (denom_hi, denom_lo, approx);
+
+    L_32 = L_sub ((Word32) 0x7fffffffL, L_32);
+
+    L_Extract (L_32, &hi, &lo);
+
+    L_32 = Mpy_32_16 (hi, lo, approx);
+
+    /* L_num * (1/L_denom) */
+
+    L_Extract (L_32, &hi, &lo);
+    L_Extract (L_num, &n_hi, &n_lo);
+    L_32 = Mpy_32 (n_hi, n_lo, hi, lo);
+    L_32 = L_shl (L_32, 2);
+
+    return (L_32);
+}
 
 void Isqrt_n(
      Word32 * frac,                        /* (i/o) Q31: normalized value (1.0 < frac <= 0.5) */
@@ -2275,93 +1859,6 @@ void Isqrt_n(
     return;
 }
 
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Pow2()                                                  |
- |                                                                           |
- |     L_x = pow(2.0, exponant.fraction)         (exponant = interger part)  |
- |         = pow(2.0, 0.fraction) << exponant                                |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |   The function Pow2(L_x) is approximated by a table and linear            |
- |   interpolation.                                                          |
- |                                                                           |
- |   1- i = bit10-b15 of fraction,   0 <= i <= 31                            |
- |   2- a = bit0-b9   of fraction                                            |
- |   3- L_x = table[i]<<16 - (table[i] - table[i+1]) * a * 2                 |
- |   4- L_x = L_x >> (30-exponant)     (with rounding)                       |
- |___________________________________________________________________________|
-*/
-static Word16 table_pow2[33] =
-{
-    16384, 16743, 17109, 17484, 17867, 18258, 18658, 19066, 19484, 19911,
-    20347, 20792, 21247, 21713, 22188, 22674, 23170, 23678, 24196, 24726,
-    25268, 25821, 26386, 26964, 27554, 28158, 28774, 29405, 30048, 30706,
-    31379, 32066, 32767
-};
-
-Word32 Pow2(                               /* (o) Q0  : result       (range: 0<=val<=0x7fffffff) */
-     Word16 exponant,                      /* (i) Q0  : Integer part.      (range: 0<=val<=30)   */
-     Word16 fraction                       /* (i) Q15 : Fractionnal part.  (range: 0.0<=val<1.0) */
-)
-{
-    Word16 exp, i, a, tmp;
-    Word32 L_x;
-
-    L_x = L_mult(fraction, 32);            /* L_x = fraction<<6           */
-    i = extract_h(L_x);                    /* Extract b10-b16 of fraction */
-    L_x = L_shr(L_x, 1);
-    a = extract_l(L_x);                    /* Extract b0-b9   of fraction */
-    a = (Word16) (a & (Word16) 0x7fff);    
-
-    L_x = L_deposit_h(table_pow2[i]);      /* table[i] << 16        */
-    tmp = sub(table_pow2[i], table_pow2[i + 1]);        /* table[i] - table[i+1] */
-    L_x = L_msu(L_x, tmp, a);              /* L_x -= tmp*a*2        */
-
-    exp = sub(30, exponant);
-    L_x = L_shr_r(L_x, exp);
-
-    return (L_x);
-}
-
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Dot_product12()                                         |
- |                                                                           |
- |       Compute scalar product of <x[],y[]> using accumulator.              |
- |                                                                           |
- |       The result is normalized (in Q31) with exponent (0..30).            |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |       dot_product = sum(x[i]*y[i])     i=0..N-1                           |
- |___________________________________________________________________________|
-*/
-
-Word32 Dot_product12(                      /* (o) Q31: normalized result (1 < val <= -1) */
-     Word16 x[],                           /* (i) 12bits: x vector                       */
-     Word16 y[],                           /* (i) 12bits: y vector                       */
-     Word16 lg,                            /* (i)    : vector length                     */
-     Word16 * exp                          /* (o)    : exponent of result (0..+30)       */
-)
-{
-    Word16 i, sft;
-    Word32 L_sum;
-
-    L_sum = 1L;                            
-    for (i = 0; i < lg; i++)
-        L_sum = L_mac(L_sum, x[i], y[i]);
-
-    /* Normalize acc in Q31 */
-
-    sft = norm_l(L_sum);
-    L_sum = L_shl(L_sum, sft);
-
-    *exp = sub(30, sft);                     /* exponent = 0..30 */
-
-    return (L_sum);
-}
 
 /*-------------------------------------------------------------------*
  *                         WB_VAD.C									 *
@@ -3279,6 +2776,2296 @@ void Weight_a(
     return;
 }
 
+/*-------------------------------------------------------------------*
+ *                         DECIM54.C								 *
+ *-------------------------------------------------------------------*
+ * Decim_12k8   : decimation of 16kHz signal to 12.8kHz.             *
+ * Oversamp_16k : oversampling from 12.8kHz to 16kHz.                *
+ *-------------------------------------------------------------------*/
 
 
+#define FAC4   4
+#define FAC5   5
+#define INV_FAC5   6554                    /* 1/5 in Q15 */
+#define DOWN_FAC  26215                    /* 4/5 in Q15 */
+#define UP_FAC    20480                    /* 5/4 in Q14 */
+
+#define NB_COEF_DOWN  15
+#define NB_COEF_UP    12
+
+/* Local functions */
+static void Down_samp(
+     Word16 * sig,                         /* input:  signal to downsampling  */
+     Word16 * sig_d,                       /* output: downsampled signal      */
+     Word16 L_frame_d                      /* input:  length of output        */
+);
+static void Up_samp(
+     Word16 * sig_d,                       /* input:  signal to oversampling  */
+     Word16 * sig_u,                       /* output: oversampled signal      */
+     Word16 L_frame                        /* input:  length of output        */
+);
+static Word16 Interpol(                    /* return result of interpolation */
+     Word16 * x,                           /* input vector                   */
+     Word16 * fir,                         /* filter coefficient             */
+     Word16 frac,                          /* fraction (0..resol)            */
+     Word16 resol,                         /* resolution                     */
+     Word16 nb_coef                        /* number of coefficients         */
+);
+
+
+/* 1/5 resolution interpolation filter  (in Q14)  */
+/* -1.5dB @ 6kHz, -6dB @ 6.4kHz, -10dB @ 6.6kHz, -20dB @ 6.9kHz, -25dB @ 7kHz, -55dB @ 8kHz */
+
+static Word16 fir_up[120] =
+{
+    -1, -4, -7, -6, 0,
+    12, 24, 30, 23, 0,
+    -33, -62, -73, -52, 0,
+    68, 124, 139, 96, 0,
+    -119, -213, -235, -160, 0,
+    191, 338, 368, 247, 0,
+    -291, -510, -552, -369, 0,
+    430, 752, 812, 542, 0,
+    -634, -1111, -1204, -809, 0,
+    963, 1708, 1881, 1288, 0,
+    -1616, -2974, -3432, -2496, 0,
+    3792, 8219, 12368, 15317, 16384,
+    15317, 12368, 8219, 3792, 0,
+    -2496, -3432, -2974, -1616, 0,
+    1288, 1881, 1708, 963, 0,
+    -809, -1204, -1111, -634, 0,
+    542, 812, 752, 430, 0,
+    -369, -552, -510, -291, 0,
+    247, 368, 338, 191, 0,
+    -160, -235, -213, -119, 0,
+    96, 139, 124, 68, 0,
+    -52, -73, -62, -33, 0,
+    23, 30, 24, 12, 0,
+    -6, -7, -4, -1, 0
+};
+
+static Word16 fir_down[120] =
+{            /* table x4/5 */
+    -1, -3, -6, -5,
+    0, 9, 19, 24,
+    18, 0, -26, -50,
+    -58, -41, 0, 54,
+    99, 111, 77, 0,
+    -95, -170, -188, -128,
+    0, 153, 270, 294,
+    198, 0, -233, -408,
+    -441, -295, 0, 344,
+    601, 649, 434, 0,
+    -507, -888, -964, -647,
+    0, 770, 1366, 1505,
+    1030, 0, -1293, -2379,
+    -2746, -1997, 0, 3034,
+    6575, 9894, 12254, 13107,
+    12254, 9894, 6575, 3034,
+    0, -1997, -2746, -2379,
+    -1293, 0, 1030, 1505,
+    1366, 770, 0, -647,
+    -964, -888, -507, 0,
+    434, 649, 601, 344,
+    0, -295, -441, -408,
+    -233, 0, 198, 294,
+    270, 153, 0, -128,
+    -188, -170, -95, 0,
+    77, 111, 99, 54,
+    0, -41, -58, -50,
+    -26, 0, 18, 24,
+    19, 9, 0, -5,
+    -6, -3, -1, 0
+};
+
+
+
+void Init_Decim_12k8(
+     Word16 mem[]                          /* output: memory (2*NB_COEF_DOWN) set to zeros */
+)
+{
+    Set_zero(mem, 2 * NB_COEF_DOWN);
+    return;
+}
+
+void Decim_12k8(
+     Word16 sig16k[],                      /* input:  signal to downsampling  */
+     Word16 lg,                            /* input:  length of input         */
+     Word16 sig12k8[],                     /* output: decimated signal        */
+     Word16 mem[]                          /* in/out: memory (2*NB_COEF_DOWN) */
+)
+{
+    Word16 lg_down;
+    Word16 signal[L_FRAME16k + (2 * NB_COEF_DOWN)];
+
+    Copy(mem, signal, 2 * NB_COEF_DOWN);
+
+    Copy(sig16k, signal + (2 * NB_COEF_DOWN), lg);
+
+    lg_down = mult(lg, DOWN_FAC);
+
+    Down_samp(signal + NB_COEF_DOWN, sig12k8, lg_down);
+
+    Copy(signal + lg, mem, 2 * NB_COEF_DOWN);
+
+    return;
+}
+
+
+void Init_Oversamp_16k(
+     Word16 mem[]                          /* output: memory (2*NB_COEF_UP) set to zeros  */
+)
+{
+    Set_zero(mem, 2 * NB_COEF_UP);
+    return;
+}
+
+
+
+static void Down_samp(
+     Word16 * sig,                         /* input:  signal to downsampling  */
+     Word16 * sig_d,                       /* output: downsampled signal      */
+     Word16 L_frame_d                      /* input:  length of output        */
+)
+{
+    Word16 i, j, frac, pos;
+
+    pos = 0;                                 /* position is in Q2 -> 1/4 resolution  */
+    for (j = 0; j < L_frame_d; j++)
+    {
+        i = shr(pos, 2);                   /* integer part     */
+        frac = (Word16) (pos & 3);           /* fractional part */
+
+        sig_d[j] = Interpol(&sig[i], fir_down, frac, FAC4, NB_COEF_DOWN);       
+
+        pos = add(pos, FAC5);              /* pos + 5/4 */
+    }
+
+    return;
+}
+
+
+static void Up_samp(
+     Word16 * sig_d,                       /* input:  signal to oversampling  */
+     Word16 * sig_u,                       /* output: oversampled signal      */
+     Word16 L_frame                        /* input:  length of output        */
+)
+{
+    Word16 i, j, pos, frac;
+
+    pos = 0;                                 /* position with 1/5 resolution */
+
+    for (j = 0; j < L_frame; j++)
+    {
+        i = mult(pos, INV_FAC5);           /* integer part = pos * 1/5 */
+        frac = sub(pos, add(shl(i, 2), i));/* frac = pos - (pos/5)*5   */
+
+        sig_u[j] = Interpol(&sig_d[i], fir_up, frac, FAC5, NB_COEF_UP); 
+
+        pos = add(pos, FAC4);              /* position + 4/5 */
+    }
+
+    return;
+}
+
+/* Fractional interpolation of signal at position (frac/resol) */
+
+static Word16 Interpol(                    /* return result of interpolation */
+     Word16 * x,                           /* input vector                   */
+     Word16 * fir,                         /* filter coefficient             */
+     Word16 frac,                          /* fraction (0..resol)            */
+     Word16 resol,                         /* resolution                     */
+     Word16 nb_coef                        /* number of coefficients         */
+)
+{
+    Word16 i, k;
+    Word32 L_sum;
+
+    x = x - nb_coef + 1;                   
+
+    L_sum = 0L;                            
+    for (i = 0, k = sub(sub(resol, 1), frac); i < 2 * nb_coef; i++, k = (Word16) (k + resol))
+    {
+        L_sum = L_mac(L_sum, x[i], fir[k]);
+    }
+    L_sum = L_shl(L_sum, 1);               /* saturation can occur here */
+
+    return (round(L_sum));
+}
+
+/*-----------------------------------------------------------------------*
+ *                         HP50.C										 *
+ *-----------------------------------------------------------------------*
+ * 2nd order high pass filter with cut off frequency at 31 Hz.           *
+ * Designed with cheby2 function in MATLAB.                              *
+ * Optimized for fixed-point to get the following frequency response:    *
+ *                                                                       *
+ *  frequency:     0Hz    14Hz  24Hz   31Hz   37Hz   41Hz   47Hz         *
+ *  dB loss:     -infdB  -15dB  -6dB   -3dB  -1.5dB  -1dB  -0.5dB        *
+ *                                                                       *
+ * Algorithm:                                                            *
+ *                                                                       *
+ *  y[i] = b[0]*x[i] + b[1]*x[i-1] + b[2]*x[i-2]                         *
+ *                   + a[1]*y[i-1] + a[2]*y[i-2];                        *
+ *                                                                       *
+ *  Word16 b[3] = {4053, -8106, 4053};       in Q12                     *
+ *  Word16 a[3] = {8192, 16211, -8021};       in Q12                     *
+ *                                                                       *
+ *  float -->   b[3] = {0.989501953, -1.979003906,  0.989501953};        *
+ *              a[3] = {1.000000000,  1.978881836, -0.979125977};        *
+ *-----------------------------------------------------------------------*/
+
+
+
+
+/* Initialization of static values */
+
+void Init_HP50_12k8(Word16 mem[])
+{
+    Set_zero(mem, 6);
+}
+
+
+void HP50_12k8(
+     Word16 signal[],                      /* input/output signal */
+     Word16 lg,                            /* lenght of signal    */
+     Word16 mem[]                          /* filter memory [6]   */
+)
+{
+    Word16 i, x2;
+    Word16 y2_hi, y2_lo, y1_hi, y1_lo, x0, x1;
+    Word32 L_tmp;
+	/* filter coefficients	*/
+	static Word16 b[3] = {4053, -8106, 4053};  /* Q12 */
+	static Word16 a[3] = {8192, 16211, -8021}; /* Q12 (x2) */
+
+    y2_hi = mem[0];                        
+    y2_lo = mem[1];                        
+    y1_hi = mem[2];                        
+    y1_lo = mem[3];                        
+    x0 = mem[4];                           
+    x1 = mem[5];                           
+
+    for (i = 0; i < lg; i++)
+    {
+        x2 = x1;                           
+        x1 = x0;                           
+        x0 = signal[i];                    
+
+        /* y[i] = b[0]*x[i] + b[1]*x[i-1] + b140[2]*x[i-2]  */
+        /* + a[1]*y[i-1] + a[2] * y[i-2];  */
+
+        
+        L_tmp = 16384L;                    /* rounding to maximise precision */
+        L_tmp = L_mac(L_tmp, y1_lo, a[1]);
+        L_tmp = L_mac(L_tmp, y2_lo, a[2]);
+        L_tmp = L_shr(L_tmp, 15);
+        L_tmp = L_mac(L_tmp, y1_hi, a[1]);
+        L_tmp = L_mac(L_tmp, y2_hi, a[2]);
+        L_tmp = L_mac(L_tmp, x0, b[0]);
+        L_tmp = L_mac(L_tmp, x1, b[1]);
+        L_tmp = L_mac(L_tmp, x2, b[2]);
+
+        L_tmp = L_shl(L_tmp, 2);           /* coeff Q12 --> Q14 */
+
+        y2_hi = y1_hi;                     
+        y2_lo = y1_lo;                     
+        L_Extract(L_tmp, &y1_hi, &y1_lo);
+
+        L_tmp = L_shl(L_tmp, 1);           /* coeff Q14 --> Q15 with saturation */
+        signal[i] = round(L_tmp);          
+    }
+
+    mem[0] = y2_hi;                        
+    mem[1] = y2_lo;                        
+    mem[2] = y1_hi;                        
+    mem[3] = y1_lo;                        
+    mem[4] = x0;                           
+    mem[5] = x1;                           
+
+    return;
+}
+
+/*-------------------------------------------------------------------*
+ *                         SCALE.C									 *
+ *-------------------------------------------------------------------*
+ * Scale signal to get maximum of dynamic.							 *
+ *-------------------------------------------------------------------*/
+
+void Scale_sig(
+     Word16 x[],                           /* (i/o) : signal to scale               */
+     Word16 lg,                            /* (i)   : size of x[]                   */
+     Word16 exp                            /* (i)   : exponent: x = round(x << exp) */
+)
+{
+    Word16 i;
+    Word32 L_tmp;
+
+    for (i = 0; i < lg; i++)
+    {
+        L_tmp = L_deposit_h(x[i]);
+        L_tmp = L_shl(L_tmp, exp);         /* saturation can occur here */
+        x[i] = round(L_tmp);               
+    }
+
+    return;
+}
+
+/*------------------------------------------------------------------------*
+ *                         AUTOCORR.C                                     *
+ *------------------------------------------------------------------------*
+ *   Compute autocorrelations of signal with windowing                    *
+ *                                                                        *
+ *------------------------------------------------------------------------*/
+
+
+#include "ham_wind.tab"
+
+
+void Autocorr(
+     Word16 x[],                           /* (i)    : Input signal                      */
+     Word16 m,                             /* (i)    : LPC order                         */
+     Word16 r_h[],                         /* (o) Q15: Autocorrelations  (msb)           */
+     Word16 r_l[]                          /* (o)    : Autocorrelations  (lsb)           */
+)
+{
+    Word16 i, j, norm, shift, y[L_WINDOW];
+    Word32 L_sum, L_tmp;
+
+    /* Windowing of signal */
+
+    for (i = 0; i < L_WINDOW; i++)
+    {
+        y[i] = mult_r(x[i], window[i]);    
+    }
+
+    /* calculate energy of signal */
+
+    L_sum = L_deposit_h(16);               /* sqrt(256), avoid overflow after rounding */
+    for (i = 0; i < L_WINDOW; i++)
+    {
+        L_tmp = L_mult(y[i], y[i]);
+        L_tmp = L_shr(L_tmp, 8);
+        L_sum = L_add(L_sum, L_tmp);
+    }
+
+    /* scale signal to avoid overflow in autocorrelation */
+
+    norm = norm_l(L_sum);
+    shift = sub(4, shr(norm, 1));
+    
+    if (shift < 0)
+    {
+        shift = 0;                         
+    }
+    for (i = 0; i < L_WINDOW; i++)
+    {
+        y[i] = shr_r(y[i], shift);         
+    }
+
+    /* Compute and normalize r[0] */
+
+    L_sum = 1;                             
+    for (i = 0; i < L_WINDOW; i++)
+        L_sum = L_mac(L_sum, y[i], y[i]);
+
+    norm = norm_l(L_sum);
+    L_sum = L_shl(L_sum, norm);
+    L_Extract(L_sum, &r_h[0], &r_l[0]);    /* Put in DPF format (see oper_32b) */
+
+    /* Compute r[1] to r[m] */
+
+    for (i = 1; i <= m; i++)
+    {
+        L_sum = 0;                         
+        for (j = 0; j < L_WINDOW - i; j++)
+            L_sum = L_mac(L_sum, y[j], y[j + i]);
+
+        L_sum = L_shl(L_sum, norm);
+        L_Extract(L_sum, &r_h[i], &r_l[i]);
+    }
+
+    return;
+}
+
+/*---------------------------------------------------------*
+ *                         LAG_WIND.C					   *
+ *---------------------------------------------------------*
+ * Lag_window on autocorrelations.                         *
+ *                                                         *
+ * r[i] *= lag_wind[i]                                     *
+ *                                                         *
+ *  r[i] and lag_wind[i] are in special double precision.  *
+ *  See "oper_32b.c" for the format                        *
+ *---------------------------------------------------------*/
+
+
+#include "lag_wind.tab"
+
+
+void Lag_window(
+     Word16 r_h[],                         /* (i/o)   : Autocorrelations  (msb)          */
+     Word16 r_l[]                          /* (i/o)   : Autocorrelations  (lsb)          */
+)
+{
+    Word16 i;
+    Word32 x;
+
+    for (i = 1; i <= M; i++)
+    {
+        x = Mpy_32(r_h[i], r_l[i], lag_h[i - 1], lag_l[i - 1]);
+        L_Extract(x, &r_h[i], &r_l[i]);
+    }
+    return;
+}
+
+/*---------------------------------------------------------------------------*
+ *                         LEVINSON.C										 *
+ *---------------------------------------------------------------------------*
+ *                                                                           *
+ *      LEVINSON-DURBIN algorithm in double precision                        *
+ *      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                        *
+ *                                                                           *
+ * Algorithm                                                                 *
+ *                                                                           *
+ *       R[i]    autocorrelations.                                           *
+ *       A[i]    filter coefficients.                                        *
+ *       K       reflection coefficients.                                    *
+ *       Alpha   prediction gain.                                            *
+ *                                                                           *
+ *       Initialization:                                                     *
+ *               A[0] = 1                                                    *
+ *               K    = -R[1]/R[0]                                           *
+ *               A[1] = K                                                    *
+ *               Alpha = R[0] * (1-K**2]                                     *
+ *                                                                           *
+ *       Do for  i = 2 to M                                                  *
+ *                                                                           *
+ *            S =  SUM ( R[j]*A[i-j] ,j=1,i-1 ) +  R[i]                      *
+ *                                                                           *
+ *            K = -S / Alpha                                                 *
+ *                                                                           *
+ *            An[j] = A[j] + K*A[i-j]   for j=1 to i-1                       *
+ *                                      where   An[i] = new A[i]             *
+ *            An[i]=K                                                        *
+ *                                                                           *
+ *            Alpha=Alpha * (1-K**2)                                         *
+ *                                                                           *
+ *       END                                                                 *
+ *                                                                           *
+ * Remarks on the dynamics of the calculations.                              *
+ *                                                                           *
+ *       The numbers used are in double precision in the following format :  *
+ *       A = AH <<16 + AL<<1.  AH and AL are 16 bit signed integers.         *
+ *       Since the LSB's also contain a sign bit, this format does not       *
+ *       correspond to standard 32 bit integers.  We use this format since   *
+ *       it allows fast execution of multiplications and divisions.          *
+ *                                                                           *
+ *       "DPF" will refer to this special format in the following text.      *
+ *       See oper_32b.c                                                      *
+ *                                                                           *
+ *       The R[i] were normalized in routine AUTO (hence, R[i] < 1.0).       *
+ *       The K[i] and Alpha are theoretically < 1.0.                         *
+ *       The A[i], for a sampling frequency of 8 kHz, are in practice        *
+ *       always inferior to 16.0.                                            *
+ *                                                                           *
+ *       These characteristics allow straigthforward fixed-point             *
+ *       implementation.  We choose to represent the parameters as           *
+ *       follows :                                                           *
+ *                                                                           *
+ *               R[i]    Q31   +- .99..                                      *
+ *               K[i]    Q31   +- .99..                                      *
+ *               Alpha   Normalized -> mantissa in Q31 plus exponent         *
+ *               A[i]    Q27   +- 15.999..                                   *
+ *                                                                           *
+ *       The additions are performed in 32 bit.  For the summation used      *
+ *       to calculate the K[i], we multiply numbers in Q31 by numbers        *
+ *       in Q27, with the result of the multiplications in Q27,              *
+ *       resulting in a dynamic of +- 16.  This is sufficient to avoid       *
+ *       overflow, since the final result of the summation is                *
+ *       necessarily < 1.0 as both the K[i] and Alpha are                    *
+ *       theoretically < 1.0.                                                *
+ *___________________________________________________________________________*/
+
+
+#define M   16
+#define NC  (M/2)
+
+void Init_Levinson(
+     Word16 * mem                          /* output  :static memory (18 words) */
+)
+{
+    Set_zero(mem, 18);                     /* old_A[0..M-1] = 0, old_rc[0..1] = 0 */
+    return;
+}
+
+
+void Levinson(
+     Word16 Rh[],                          /* (i)     : Rh[M+1] Vector of autocorrelations (msb) */
+     Word16 Rl[],                          /* (i)     : Rl[M+1] Vector of autocorrelations (lsb) */
+     Word16 A[],                           /* (o) Q12 : A[M]    LPC coefficients  (m = 16)       */
+     Word16 rc[],                          /* (o) Q15 : rc[M]   Reflection coefficients.         */
+     Word16 * mem                          /* (i/o)   :static memory (18 words)                  */
+)
+{
+    Word16 i, j;
+    Word16 hi, lo;
+    Word16 Kh, Kl;                         /* reflection coefficient; hi and lo           */
+    Word16 alp_h, alp_l, alp_exp;          /* Prediction gain; hi lo and exponent         */
+    Word16 Ah[M + 1], Al[M + 1];           /* LPC coef. in double prec.                   */
+    Word16 Anh[M + 1], Anl[M + 1];         /* LPC coef.for next iteration in double prec. */
+    Word32 t0, t1, t2;                     /* temporary variable                          */
+    Word16 *old_A, *old_rc;
+
+    /* Last A(z) for case of unstable filter */
+
+    old_A = mem;                           
+    old_rc = mem + M;                      
+
+    /* K = A[1] = -R[1] / R[0] */
+
+    t1 = L_Comp(Rh[1], Rl[1]);             /* R[1] in Q31      */
+    t2 = L_abs(t1);                        /* abs R[1]         */
+    t0 = Div_32(t2, Rh[0], Rl[0]);         /* R[1]/R[0] in Q31 */
+    
+    if (t1 > 0)
+        t0 = L_negate(t0);                 /* -R[1]/R[0]       */
+    L_Extract(t0, &Kh, &Kl);               /* K in DPF         */
+    rc[0] = Kh;                            
+    t0 = L_shr(t0, 4);                     /* A[1] in Q27      */
+    L_Extract(t0, &Ah[1], &Al[1]);         /* A[1] in DPF      */
+
+    /* Alpha = R[0] * (1-K**2) */
+
+    t0 = Mpy_32(Kh, Kl, Kh, Kl);           /* K*K      in Q31 */
+    t0 = L_abs(t0);                        /* Some case <0 !! */
+    t0 = L_sub((Word32) 0x7fffffffL, t0);  /* 1 - K*K  in Q31 */
+    L_Extract(t0, &hi, &lo);               /* DPF format      */
+    t0 = Mpy_32(Rh[0], Rl[0], hi, lo);     /* Alpha in Q31    */
+
+    /* Normalize Alpha */
+
+    alp_exp = norm_l(t0);
+    t0 = L_shl(t0, alp_exp);
+    L_Extract(t0, &alp_h, &alp_l);
+    /* DPF format    */
+
+    /*--------------------------------------*
+     * ITERATIONS  I=2 to M                 *
+     *--------------------------------------*/
+
+    for (i = 2; i <= M; i++)
+    {
+
+        /* t0 = SUM ( R[j]*A[i-j] ,j=1,i-1 ) +  R[i] */
+
+        t0 = 0;                            
+        for (j = 1; j < i; j++)
+            t0 = L_add(t0, Mpy_32(Rh[j], Rl[j], Ah[i - j], Al[i - j]));
+
+        t0 = L_shl(t0, 4);                 /* result in Q27 -> convert to Q31 */
+        /* No overflow possible            */
+        t1 = L_Comp(Rh[i], Rl[i]);
+        t0 = L_add(t0, t1);                /* add R[i] in Q31                 */
+
+        /* K = -t0 / Alpha */
+
+        t1 = L_abs(t0);
+        t2 = Div_32(t1, alp_h, alp_l);     /* abs(t0)/Alpha                   */
+        
+        if (t0 > 0)
+            t2 = L_negate(t2);             /* K =-t0/Alpha                    */
+        t2 = L_shl(t2, alp_exp);           /* denormalize; compare to Alpha   */
+        L_Extract(t2, &Kh, &Kl);           /* K in DPF                        */
+        rc[i - 1] = Kh;                    
+
+        /* Test for unstable filter. If unstable keep old A(z) */
+
+        
+        if (sub(abs_s(Kh), 32750) > 0)
+        {
+            A[0] = 4096;                     /* Ai[0] not stored (always 1.0) */
+            for (j = 0; j < M; j++)
+            {
+                A[j + 1] = old_A[j];       
+            }
+            rc[0] = old_rc[0];             /* only two rc coefficients are needed */
+            rc[1] = old_rc[1];
+            
+            return;
+        }
+        /*------------------------------------------*
+         *  Compute new LPC coeff. -> An[i]         *
+         *  An[j]= A[j] + K*A[i-j]     , j=1 to i-1 *
+         *  An[i]= K                                *
+         *------------------------------------------*/
+
+        for (j = 1; j < i; j++)
+        {
+            t0 = Mpy_32(Kh, Kl, Ah[i - j], Al[i - j]);
+            t0 = L_add(t0, L_Comp(Ah[j], Al[j]));
+            L_Extract(t0, &Anh[j], &Anl[j]);
+        }
+        t2 = L_shr(t2, 4);                 /* t2 = K in Q31 ->convert to Q27  */
+        L_Extract(t2, &Anh[i], &Anl[i]);   /* An[i] in Q27                    */
+
+        /* Alpha = Alpha * (1-K**2) */
+
+        t0 = Mpy_32(Kh, Kl, Kh, Kl);       /* K*K      in Q31 */
+        t0 = L_abs(t0);                    /* Some case <0 !! */
+        t0 = L_sub((Word32) 0x7fffffffL, t0);   /* 1 - K*K  in Q31 */
+        L_Extract(t0, &hi, &lo);           /* DPF format      */
+        t0 = Mpy_32(alp_h, alp_l, hi, lo); /* Alpha in Q31    */
+
+        /* Normalize Alpha */
+
+        j = norm_l(t0);
+        t0 = L_shl(t0, j);
+        L_Extract(t0, &alp_h, &alp_l);     /* DPF format    */
+        alp_exp = add(alp_exp, j);         /* Add normalization to alp_exp */
+
+        /* A[j] = An[j] */
+
+        for (j = 1; j <= i; j++)
+        {
+            Ah[j] = Anh[j];                
+            Al[j] = Anl[j];                
+        }
+    }
+
+    /* Truncate A[i] in Q27 to Q12 with rounding */
+
+    A[0] = 4096;                           
+    for (i = 1; i <= M; i++)
+    {
+        t0 = L_Comp(Ah[i], Al[i]);
+        old_A[i - 1] = A[i] = round(L_shl(t0, 1));      
+    }
+    old_rc[0] = rc[0];                     
+    old_rc[1] = rc[1];                     
+
+    return;
+}
+
+/*-----------------------------------------------------------------------*
+ *                         Az_isp.C                                      *
+ *-----------------------------------------------------------------------*
+ * Compute the ISPs from  the LPC coefficients  (order=M)                *
+ *-----------------------------------------------------------------------*
+ *                                                                       *
+ * The ISPs are the roots of the two polynomials F1(z) and F2(z)         *
+ * defined as                                                            *
+ *               F1(z) = A(z) + z^-m A(z^-1)                             *
+ *  and          F2(z) = A(z) - z^-m A(z^-1)                             *
+ *                                                                       *
+ * For a even order m=2n, F1(z) has M/2 conjugate roots on the unit      *
+ * circle and F2(z) has M/2-1 conjugate roots on the unit circle in      *
+ * addition to two roots at 0 and pi.                                    *
+ *                                                                       *
+ * For a 16th order LP analysis, F1(z) and F2(z) can be written as       *
+ *                                                                       *
+ *   F1(z) = (1 + a[M])   PRODUCT  (1 - 2 cos(w_i) z^-1 + z^-2 )         *
+ *                        i=0,2,4,6,8,10,12,14                           *
+ *                                                                       *
+ *   F2(z) = (1 - a[M]) (1 - z^-2) PRODUCT (1 - 2 cos(w_i) z^-1 + z^-2 ) *
+ *                                 i=1,3,5,7,9,11,13                     *
+ *                                                                       *
+ * The ISPs are the M-1 frequencies w_i, i=0...M-2 plus the last         *
+ * predictor coefficient a[M].                                           *
+ *-----------------------------------------------------------------------*/
+
+
+#include "grid100.tab"
+
+#define M   16
+#define NC  (M/2)
+
+/* local function */
+static Word16 Chebps2(Word16 x, Word16 f[], Word16 n);
+
+void Az_isp(
+     Word16 a[],                           /* (i) Q12 : predictor coefficients                 */
+     Word16 isp[],                         /* (o) Q15 : Immittance spectral pairs              */
+     Word16 old_isp[]                      /* (i)     : old isp[] (in case not found M roots)  */
+)
+{
+    Word16 i, j, nf, ip, order;
+    Word16 xlow, ylow, xhigh, yhigh, xmid, ymid, xint;
+    Word16 x, y, sign, exp;
+    Word16 *coef;
+    Word16 f1[NC + 1], f2[NC];
+    Word32 t0;
+
+    /*-------------------------------------------------------------*
+     * find the sum and diff polynomials F1(z) and F2(z)           *
+     *      F1(z) = [A(z) + z^M A(z^-1)]                           *
+     *      F2(z) = [A(z) - z^M A(z^-1)]/(1-z^-2)                  *
+     *                                                             *
+     * for (i=0; i<NC; i++)                                        *
+     * {                                                           *
+     *   f1[i] = a[i] + a[M-i];                                    *
+     *   f2[i] = a[i] - a[M-i];                                    *
+     * }                                                           *
+     * f1[NC] = 2.0*a[NC];                                         *
+     *                                                             *
+     * for (i=2; i<NC; i++)            Divide by (1-z^-2)          *
+     *   f2[i] += f2[i-2];                                         *
+     *-------------------------------------------------------------*/
+
+    for (i = 0; i < NC; i++)
+    {
+        t0 = L_mult(a[i], 16384);
+        f1[i] = round(L_mac(t0, a[M - i], 16384));        /* =(a[i]+a[M-i])/2 */
+        f2[i] = round(L_msu(t0, a[M - i], 16384));        /* =(a[i]-a[M-i])/2 */
+    }
+    f1[NC] = a[NC];                        
+
+    for (i = 2; i < NC; i++)               /* Divide by (1-z^-2) */
+        f2[i] = add(f2[i], f2[i - 2]);     
+
+    /*---------------------------------------------------------------------*
+     * Find the ISPs (roots of F1(z) and F2(z) ) using the                 *
+     * Chebyshev polynomial evaluation.                                    *
+     * The roots of F1(z) and F2(z) are alternatively searched.            *
+     * We start by finding the first root of F1(z) then we switch          *
+     * to F2(z) then back to F1(z) and so on until all roots are found.    *
+     *                                                                     *
+     *  - Evaluate Chebyshev pol. at grid points and check for sign change.*
+     *  - If sign change track the root by subdividing the interval        *
+     *    2 times and ckecking sign change.                                *
+     *---------------------------------------------------------------------*/
+
+    nf = 0;                                  /* number of found frequencies */
+    ip = 0;                                  /* indicator for f1 or f2      */
+
+    coef = f1;                             
+    order = NC;                            
+
+    xlow = grid[0];                        
+    ylow = Chebps2(xlow, coef, order);
+
+    j = 0;
+    
+    while ((nf < M - 1) && (j < GRID_POINTS))
+    {
+        j = add(j, 1);
+        xhigh = xlow;                      
+        yhigh = ylow;                      
+        xlow = grid[j];                    
+        ylow = Chebps2(xlow, coef, order);
+
+        
+        if (L_mult(ylow, yhigh) <= (Word32) 0)
+        {
+            /* divide 2 times the interval */
+
+            for (i = 0; i < 2; i++)
+            {
+                xmid = add(shr(xlow, 1), shr(xhigh, 1));        /* xmid = (xlow + xhigh)/2 */
+
+                ymid = Chebps2(xmid, coef, order);
+
+                
+                if (L_mult(ylow, ymid) <= (Word32) 0)
+                {
+                    yhigh = ymid;          
+                    xhigh = xmid;          
+                } else
+                {
+                    ylow = ymid;           
+                    xlow = xmid;           
+                }
+            }
+
+            /*-------------------------------------------------------------*
+             * Linear interpolation                                        *
+             *    xint = xlow - ylow*(xhigh-xlow)/(yhigh-ylow);            *
+             *-------------------------------------------------------------*/
+
+            x = sub(xhigh, xlow);
+            y = sub(yhigh, ylow);
+
+            
+            if (y == 0)
+            {
+                xint = xlow;               
+            } else
+            {
+                sign = y;                  
+                y = abs_s(y);
+                exp = norm_s(y);
+                y = shl(y, exp);
+                y = div_s((Word16) 16383, y);
+                t0 = L_mult(x, y);
+                t0 = L_shr(t0, sub(20, exp));
+                y = extract_l(t0);         /* y= (xhigh-xlow)/(yhigh-ylow) in Q11 */
+
+                
+                if (sign < 0)
+                    y = negate(y);
+
+                t0 = L_mult(ylow, y);      /* result in Q26 */
+                t0 = L_shr(t0, 11);        /* result in Q15 */
+                xint = sub(xlow, extract_l(t0));        /* xint = xlow - ylow*y */
+            }
+
+            isp[nf] = xint;                
+            xlow = xint;                   
+            nf++;                          
+
+            
+            if (ip == 0)
+            {
+                ip = 1;                    
+                coef = f2;                 
+                order = NC - 1;            
+            } else
+            {
+                ip = 0;                    
+                coef = f1;                 
+                order = NC;                
+            }
+            ylow = Chebps2(xlow, coef, order);
+        }
+        
+    }
+
+    /* Check if M-1 roots found */
+
+    
+    if (sub(nf, M - 1) < 0)
+    {
+        for (i = 0; i < M; i++)
+        {
+            isp[i] = old_isp[i];           
+        }
+    } else
+    {
+        isp[M - 1] = shl(a[M], 3);           /* From Q12 to Q15 with saturation */
+    }
+
+    return;
+}
+
+
+/*--------------------------------------------------------------*
+ * function  Chebps2:                                           *
+ *           ~~~~~~~                                            *
+ *    Evaluates the Chebishev polynomial series                 *
+ *--------------------------------------------------------------*
+ *                                                              *
+ *  The polynomial order is                                     *
+ *     n = M/2   (M is the prediction order)                    *
+ *  The polynomial is given by                                  *
+ *    C(x) = f(0)T_n(x) + f(1)T_n-1(x) + ... +f(n-1)T_1(x) + f(n)/2 *
+ * Arguments:                                                   *
+ *  x:     input value of evaluation; x = cos(frequency) in Q15 *
+ *  f[]:   coefficients of the pol.                      in Q11 *
+ *  n:     order of the pol.                                    *
+ *                                                              *
+ * The value of C(x) is returned. (Satured to +-1.99 in Q14)    *
+ *                                                              *
+ *--------------------------------------------------------------*/
+
+static Word16 Chebps2(Word16 x, Word16 f[], Word16 n)
+{
+    Word16 i, cheb;
+    Word16 b0_h, b0_l, b1_h, b1_l, b2_h, b2_l;
+    Word32 t0;
+
+    /* Note: All computation are done in Q24. */
+
+    t0 = L_mult(f[0], 4096);
+    L_Extract(t0, &b2_h, &b2_l);           /* b2 = f[0] in Q24 DPF */
+
+    t0 = Mpy_32_16(b2_h, b2_l, x);         /* t0 = 2.0*x*b2        */
+    t0 = L_shl(t0, 1);
+    t0 = L_mac(t0, f[1], 4096);            /* + f[1] in Q24        */
+    L_Extract(t0, &b1_h, &b1_l);           /* b1 = 2*x*b2 + f[1]   */
+
+    for (i = 2; i < n; i++)
+    {
+        t0 = Mpy_32_16(b1_h, b1_l, x);     /* t0 = 2.0*x*b1              */
+
+        t0 = L_mac(t0, b2_h, -16384);
+        t0 = L_mac(t0, f[i], 2048);
+        t0 = L_shl(t0, 1);
+        t0 = L_msu(t0, b2_l, 1);           /* t0 = 2.0*x*b1 - b2 + f[i]; */
+
+        L_Extract(t0, &b0_h, &b0_l);       /* b0 = 2.0*x*b1 - b2 + f[i]; */
+
+        b2_l = b1_l;                         /* b2 = b1; */
+        b2_h = b1_h;                       
+        b1_l = b0_l;                         /* b1 = b0; */
+        b1_h = b0_h;                       
+    }
+
+    t0 = Mpy_32_16(b1_h, b1_l, x);         /* t0 = x*b1;              */
+    t0 = L_mac(t0, b2_h, (Word16) - 32768);/* t0 = x*b1 - b2          */
+    t0 = L_msu(t0, b2_l, 1);
+    t0 = L_mac(t0, f[n], 2048);            /* t0 = x*b1 - b2 + f[i]/2 */
+
+    t0 = L_shl(t0, 6);                     /* Q24 to Q30 with saturation */
+
+    cheb = extract_h(t0);                  /* Result in Q14              */
+
+    
+    if (sub(cheb, -32768) == 0)
+    {
+        cheb = -32767;                     /* to avoid saturation in Az_isp */
+        
+    }
+    return (cheb);
+}
+
+/*-----------------------------------------------------------------------*
+ *                         ISP_AZ.C										 *
+ *-----------------------------------------------------------------------*
+ * Compute the LPC coefficients from isp (order=M)						 *
+ *-----------------------------------------------------------------------*/
+
+
+
+#define NC (M/2)
+#define NC16k (M16k/2)
+
+/* local function */
+
+static void Get_isp_pol(Word16 * isp, Word32 * f, Word16 n);
+static void Get_isp_pol_16kHz(Word16 * isp, Word32 * f, Word16 n);
+
+void Isp_Az(
+     Word16 isp[],                         /* (i) Q15 : Immittance spectral pairs            */
+     Word16 a[],                           /* (o) Q12 : predictor coefficients (order = M)   */
+     Word16 m,
+     Word16 adaptive_scaling               /* (i) 0   : adaptive scaling disabled */
+                                           /*     1   : adaptive scaling enabled  */
+)
+{
+    Word16 i, j, hi, lo;
+    Word32 f1[NC16k + 1], f2[NC16k];
+    Word16 nc;
+    Word32 t0;
+    Word16 q, q_sug;
+    Word32 tmax;
+
+    nc = shr(m, 1);
+    
+    if (sub(nc, 8) > 0)
+    {
+        Get_isp_pol_16kHz(&isp[0], f1, nc);
+        for (i = 0; i <= nc; i++)
+        {
+            f1[i] = L_shl(f1[i], 2);       
+        }
+    } else
+        Get_isp_pol(&isp[0], f1, nc);
+
+    
+    if (sub(nc, 8) > 0)
+    {
+        Get_isp_pol_16kHz(&isp[1], f2, sub(nc, 1));
+        for (i = 0; i <= nc - 1; i++)
+        {
+            f2[i] = L_shl(f2[i], 2);       
+        }
+    } else
+        Get_isp_pol(&isp[1], f2, sub(nc, 1));
+
+    /*-----------------------------------------------------*
+     *  Multiply F2(z) by (1 - z^-2)                       *
+     *-----------------------------------------------------*/
+
+    for (i = sub(nc, 1); i > 1; i--)
+    {
+        f2[i] = L_sub(f2[i], f2[i - 2]);     /* f2[i] -= f2[i-2]; */
+    }
+
+    /*----------------------------------------------------------*
+     *  Scale F1(z) by (1+isp[m-1])  and  F2(z) by (1-isp[m-1]) *
+     *----------------------------------------------------------*/
+
+    for (i = 0; i < nc; i++)
+    {
+        /* f1[i] *= (1.0 + isp[M-1]); */
+
+        L_Extract(f1[i], &hi, &lo);
+        t0 = Mpy_32_16(hi, lo, isp[m - 1]);
+        f1[i] = L_add(f1[i], t0);          
+
+        /* f2[i] *= (1.0 - isp[M-1]); */
+
+        L_Extract(f2[i], &hi, &lo);
+        t0 = Mpy_32_16(hi, lo, isp[m - 1]);
+        f2[i] = L_sub(f2[i], t0);          
+    }
+
+    /*-----------------------------------------------------*
+     *  A(z) = (F1(z)+F2(z))/2                             *
+     *  F1(z) is symmetric and F2(z) is antisymmetric      *
+     *-----------------------------------------------------*/
+
+    /* a[0] = 1.0; */
+    a[0] = 4096;                           
+    tmax = 1;                              
+    for (i = 1, j = sub(m, 1); i < nc; i++, j--)
+    {
+        /* a[i] = 0.5*(f1[i] + f2[i]); */
+
+        t0 = L_add(f1[i], f2[i]);          /* f1[i] + f2[i]             */
+        tmax |= L_abs(t0);                 logic32();
+        a[i] = extract_l(L_shr_r(t0, 12)); /* from Q23 to Q12 and * 0.5 */
+        
+
+        /* a[j] = 0.5*(f1[i] - f2[i]); */
+
+        t0 = L_sub(f1[i], f2[i]);          /* f1[i] - f2[i]             */
+        tmax |= L_abs(t0);                 logic32();
+        a[j] = extract_l(L_shr_r(t0, 12)); /* from Q23 to Q12 and * 0.5 */
+        
+    }
+
+    /* rescale data if overflow has occured and reprocess the loop */
+
+    
+    if ( sub(adaptive_scaling, 1) == 0 )
+       q = sub(4, norm_l(tmax));        /* adaptive scaling enabled */
+    else
+       q = 0;                  /* adaptive scaling disabled */
+
+    
+    if (q > 0)
+    {
+      q_sug = add(12, q);
+      for (i = 1, j = sub(m, 1); i < nc; i++, j--)
+        {
+          /* a[i] = 0.5*(f1[i] + f2[i]); */
+
+          t0 = L_add(f1[i], f2[i]);          /* f1[i] + f2[i]             */
+          a[i] = extract_l(L_shr_r(t0, q_sug)); /* from Q23 to Q12 and * 0.5 */
+          
+
+          /* a[j] = 0.5*(f1[i] - f2[i]); */
+
+          t0 = L_sub(f1[i], f2[i]);          /* f1[i] - f2[i]             */
+          a[j] = extract_l(L_shr_r(t0, q_sug)); /* from Q23 to Q12 and * 0.5 */
+          
+        }
+      a[0] = shr(a[0], q);                 
+    }
+    else
+    {
+      q_sug = 12;                          
+      q     = 0;                           
+    }
+
+
+    /* a[NC] = 0.5*f1[NC]*(1.0 + isp[M-1]); */
+
+    L_Extract(f1[nc], &hi, &lo);
+    t0 = Mpy_32_16(hi, lo, isp[m - 1]);
+    t0 = L_add(f1[nc], t0);
+    a[nc] = extract_l(L_shr_r(t0, q_sug));    /* from Q23 to Q12 and * 0.5 */
+    
+    /* a[m] = isp[m-1]; */
+
+    a[m] = shr_r(isp[m - 1], add(3,q));           /* from Q15 to Q12          */
+    
+
+    return;
+}
+
+/*-----------------------------------------------------------*
+ * procedure Get_isp_pol:                                    *
+ *           ~~~~~~~~~~~                                     *
+ *   Find the polynomial F1(z) or F2(z) from the ISPs.       *
+ * This is performed by expanding the product polynomials:   *
+ *                                                           *
+ * F1(z) =   product   ( 1 - 2 isp_i z^-1 + z^-2 )           *
+ *         i=0,2,4,6,8                                       *
+ * F2(z) =   product   ( 1 - 2 isp_i z^-1 + z^-2 )           *
+ *         i=1,3,5,7                                         *
+ *                                                           *
+ * where isp_i are the ISPs in the cosine domain.            *
+ *-----------------------------------------------------------*
+ *                                                           *
+ * Parameters:                                               *
+ *  isp[]   : isp vector (cosine domaine)         in Q15     *
+ *  f[]     : the coefficients of F1 or F2        in Q23     *
+ *  n       : == NC for F1(z); == NC-1 for F2(z)             *
+ *-----------------------------------------------------------*/
+
+static void Get_isp_pol(Word16 * isp, Word32 * f, Word16 n)
+{
+    Word16 i, j, hi, lo;
+    Word32 t0;
+
+
+    /* All computation in Q23 */
+
+    f[0] = L_mult(4096, 1024);               /* f[0] = 1.0;        in Q23  */
+    f[1] = L_mult(isp[0], -256);             /* f[1] = -2.0*isp[0] in Q23  */
+
+    f += 2;                                  /* Advance f pointer          */
+    isp += 2;                                /* Advance isp pointer        */
+
+    for (i = 2; i <= n; i++)
+    {
+
+        *f = f[-2];                        
+
+        for (j = 1; j < i; j++, f--)
+        {
+            L_Extract(f[-1], &hi, &lo);
+            t0 = Mpy_32_16(hi, lo, *isp);  /* t0 = f[-1] * isp    */
+            t0 = L_shl(t0, 1);
+            *f = L_sub(*f, t0);              /* *f -= t0            */
+            *f = L_add(*f, f[-2]);           /* *f += f[-2]         */
+        }
+        *f = L_msu(*f, *isp, 256);           /* *f -= isp<<8        */
+        f += i;                            /* Advance f pointer   */
+        isp += 2;                          /* Advance isp pointer */
+    }
+    return;
+}
+
+static void Get_isp_pol_16kHz(Word16 * isp, Word32 * f, Word16 n)
+{
+    Word16 i, j, hi, lo;
+    Word32 t0;
+
+    /* All computation in Q23 */
+
+    f[0] = L_mult(4096, 256);                /* f[0] = 1.0;        in Q23  */
+    f[1] = L_mult(isp[0], -64);              /* f[1] = -2.0*isp[0] in Q23  */
+
+    f += 2;                                  /* Advance f pointer          */
+    isp += 2;                                /* Advance isp pointer        */
+
+    for (i = 2; i <= n; i++)
+    {
+        *f = f[-2];                        
+
+        for (j = 1; j < i; j++, f--)
+        {
+            L_Extract(f[-1], &hi, &lo);
+            t0 = Mpy_32_16(hi, lo, *isp);  /* t0 = f[-1] * isp    */
+            t0 = L_shl(t0, 1);
+            *f = L_sub(*f, t0);              /* *f -= t0            */
+            *f = L_add(*f, f[-2]);           /* *f += f[-2]         */
+        }
+        *f = L_msu(*f, *isp, 64);            /* *f -= isp<<8        */
+        f += i;                            /* Advance f pointer   */
+        isp += 2;                          /* Advance isp pointer */
+    }
+    return;
+}
+
+/*-------------------------------------------------------------------*
+ *                         ISP_ISF.C								 *
+ *-------------------------------------------------------------------*
+ *   Isp_isf   Transformation isp to isf                             *
+ *   Isf_isp   Transformation isf to isp                             *
+ *                                                                   *
+ * The transformation from isp[i] to isf[i] and isf[i] to isp[i] are *
+ * approximated by a look-up table and interpolation.                *
+ *-------------------------------------------------------------------*/
+
+
+#include "isp_isf.tab"                     /* Look-up table for transformations */
+
+void Isp_isf(
+     Word16 isp[],                         /* (i) Q15 : isp[m] (range: -1<=val<1)                */
+     Word16 isf[],                         /* (o) Q15 : isf[m] normalized (range: 0.0<=val<=0.5) */
+     Word16 m                              /* (i)     : LPC order                                */
+)
+{
+    Word16 i, ind;
+    Word32 L_tmp;
+
+    ind = 127;                               /* beging at end of table -1 */
+
+    for (i = (Word16) (m - 1); i >= 0; i--)
+    {
+        
+        if (sub(i, sub(m, 2)) >= 0)
+        {                                  /* m-2 is a constant */
+            ind = 127;                       /* beging at end of table -1 */
+        }
+        /* find value in table that is just greater than isp[i] */
+        
+        while (sub(table[ind], isp[i]) < 0)
+            ind--;
+
+        /* acos(isp[i])= ind*128 + ( ( isp[i]-table[ind] ) * slope[ind] )/2048 */
+
+        L_tmp = L_mult(sub(isp[i], table[ind]), slope[ind]);
+        isf[i] = round(L_shl(L_tmp, 4));   /* (isp[i]-table[ind])*slope[ind])>>11 */
+        
+        isf[i] = add(isf[i], shl(ind, 7)); 
+    }
+
+    isf[m - 1] = shr(isf[m - 1], 1);       
+
+    return;
+}
+
+/*-------------------------------------------------------------------*
+ *                         DEEMPH.C									 *
+ *-------------------------------------------------------------------*
+ * Deemphasis: filtering through 1/(1-mu z^-1)				         *
+ *																	 *
+ * Deemph2   --> signal is divided by 2.							 *
+ * Deemph_32 --> for 32 bits signal.								 *
+ *-------------------------------------------------------------------*/
+
+void Deemph2(
+     Word16 x[],                           /* (i/o)   : input signal overwritten by the output */
+     Word16 mu,                            /* (i) Q15 : deemphasis factor                      */
+     Word16 L,                             /* (i)     : vector size                            */
+     Word16 * mem                          /* (i/o)   : memory (y[-1])                         */
+)
+{
+    Word16 i;
+    Word32 L_tmp;
+
+    /* saturation can occur in L_mac() */
+
+    L_tmp = L_mult(x[0], 16384);
+    L_tmp = L_mac(L_tmp, *mem, mu);
+    x[0] = round(L_tmp);                   
+
+    for (i = 1; i < L; i++)
+    {
+        L_tmp = L_mult(x[i], 16384);
+        L_tmp = L_mac(L_tmp, x[i - 1], mu);
+        x[i] = round(L_tmp);               
+    }
+
+    *mem = x[L - 1];                       
+
+    return;
+}
+
+/*-----------------------------------------------------------------------*
+ *                         HP_WSP.C										 *
+ *-----------------------------------------------------------------------*
+ *                                                                       *
+ * 3nd order high pass filter with cut off frequency at 180 Hz           *
+ *                                                                       *
+ * Algorithm:                                                            *
+ *                                                                       *
+ *  y[i] = b[0]*x[i] + b[1]*x[i-1] + b[2]*x[i-2] + b[3]*x[i-3]           *
+ *                   + a[1]*y[i-1] + a[2]*y[i-2] + a[3]*y[i-3];          *
+ *                                                                       *
+ * float a_coef[HP_ORDER]= {                                             *
+ *    -2.64436711600664f,                                                *
+ *    2.35087386625360f,                                                 *
+ *   -0.70001156927424f};                                                *
+ *                                                                       *
+ * float b_coef[HP_ORDER+1]= {                                           *
+ *     -0.83787057505665f,                                               *
+ *    2.50975570071058f,                                                 *
+ *   -2.50975570071058f,                                                 *
+ *    0.83787057505665f};                                                *
+ *                                                                       *
+ *-----------------------------------------------------------------------*/
+
+
+/* Initialization of static values */
+
+void Init_Hp_wsp(Word16 mem[])
+{
+    Set_zero(mem, 9);
+
+    return;
+}
+
+void scale_mem_Hp_wsp(Word16 mem[], Word16 exp)
+{
+    Word16 i;
+    Word32 L_tmp;
+
+    for (i = 0; i < 6; i += 2)
+    {
+        L_tmp = L_Comp(mem[i], mem[i + 1]);/* y_hi, y_lo */
+        L_tmp = L_shl(L_tmp, exp);
+        L_Extract(L_tmp, &mem[i], &mem[i + 1]);
+    }
+
+    for (i = 6; i < 9; i++)
+    {
+        L_tmp = L_deposit_h(mem[i]);       /* x[i] */
+        L_tmp = L_shl(L_tmp, exp);
+        mem[i] = round(L_tmp);             
+    }
+
+    return;
+}
+
+
+void Hp_wsp(
+     Word16 wsp[],                         /* i   : wsp[]  signal       */
+     Word16 hp_wsp[],                      /* o   : hypass wsp[]        */
+     Word16 lg,                            /* i   : lenght of signal    */
+     Word16 mem[]                          /* i/o : filter memory [9]   */
+)
+{
+    Word16 i;
+    Word16 x0, x1, x2, x3;
+    Word16 y3_hi, y3_lo, y2_hi, y2_lo, y1_hi, y1_lo;
+    Word32 L_tmp;
+	/* filter coefficients in Q12 */
+	static Word16 a[4] = {8192, 21663, -19258, 5734};
+	static Word16 b[4] = {-3432, +10280, -10280, +3432};
+
+    y3_hi = mem[0];                        
+    y3_lo = mem[1];                        
+    y2_hi = mem[2];                        
+    y2_lo = mem[3];                        
+    y1_hi = mem[4];                        
+    y1_lo = mem[5];                        
+    x0 = mem[6];                           
+    x1 = mem[7];                           
+    x2 = mem[8];                           
+
+    for (i = 0; i < lg; i++)
+    {
+        x3 = x2;                           
+        x2 = x1;                           
+        x1 = x0;                           
+        x0 = wsp[i];                       
+
+        /* y[i] = b[0]*x[i] + b[1]*x[i-1] + b140[2]*x[i-2] + b[3]*x[i-3]  */
+        /* + a[1]*y[i-1] + a[2] * y[i-2]  + a[3]*y[i-3]  */
+
+        
+        L_tmp = 16384L;                    /* rounding to maximise precision */
+        L_tmp = L_mac(L_tmp, y1_lo, a[1]);
+        L_tmp = L_mac(L_tmp, y2_lo, a[2]);
+        L_tmp = L_mac(L_tmp, y3_lo, a[3]);
+        L_tmp = L_shr(L_tmp, 15);
+        L_tmp = L_mac(L_tmp, y1_hi, a[1]);
+        L_tmp = L_mac(L_tmp, y2_hi, a[2]);
+        L_tmp = L_mac(L_tmp, y3_hi, a[3]);
+        L_tmp = L_mac(L_tmp, x0, b[0]);
+        L_tmp = L_mac(L_tmp, x1, b[1]);
+        L_tmp = L_mac(L_tmp, x2, b[2]);
+        L_tmp = L_mac(L_tmp, x3, b[3]);
+
+        L_tmp = L_shl(L_tmp, 2);           /* coeff Q12 --> Q15 */
+
+        y3_hi = y2_hi;                     
+        y3_lo = y2_lo;                     
+        y2_hi = y1_hi;                     
+        y2_lo = y1_lo;                     
+        L_Extract(L_tmp, &y1_hi, &y1_lo);
+
+        L_tmp = L_shl(L_tmp, 1);           /* coeff Q14 --> Q15 */
+        hp_wsp[i] = round(L_tmp);          
+    }
+
+    mem[0] = y3_hi;                        
+    mem[1] = y3_lo;                        
+    mem[2] = y2_hi;                        
+    mem[3] = y2_lo;                        
+    mem[4] = y1_hi;                        
+    mem[5] = y1_lo;                        
+    mem[6] = x0;                           
+    mem[7] = x1;                           
+    mem[8] = x2;                           
+
+    return;
+}
+/*-----------------------------------------------------------------------*
+ *                         HP400.C										 *
+ *-----------------------------------------------------------------------*
+ * Interpolation of the LP parameters in 4 subframes.					 *
+ *-----------------------------------------------------------------------*/
+
+
+#define MP1 (M+1)
+
+
+void Int_isp(
+     Word16 isp_old[],                     /* input : isps from past frame              */
+     Word16 isp_new[],                     /* input : isps from present frame           */
+     Word16 frac[],                        /* input : fraction for 3 first subfr (Q15)  */
+     Word16 Az[]                           /* output: LP coefficients in 4 subframes    */
+)
+{
+    Word16 i, k, fac_old, fac_new;
+    Word16 isp[M];
+    Word32 L_tmp;
+
+    for (k = 0; k < 3; k++)
+    {
+        fac_new = frac[k];                 
+        fac_old = add(sub(32767, fac_new), 1);  /* 1.0 - fac_new */
+
+        for (i = 0; i < M; i++)
+        {
+            L_tmp = L_mult(isp_old[i], fac_old);
+            L_tmp = L_mac(L_tmp, isp_new[i], fac_new);
+            isp[i] = round(L_tmp);         
+        }
+        Isp_Az(isp, Az, M, 0);
+        Az += MP1;
+    }
+
+    /* 4th subframe: isp_new (frac=1.0) */
+
+    Isp_Az(isp_new, Az, M, 0);
+
+    return;
+}
+
+/*-------------------------------------------------------------------*
+ *                         LP_DEC2.C								 *
+ *-------------------------------------------------------------------*
+ * Decimate a vector by 2 with 2nd order fir filter.                 *
+ *-------------------------------------------------------------------*/
+
+
+#define L_FIR  5
+#define L_MEM  (L_FIR-2)
+
+/* static float h_fir[L_FIR] = {0.13, 0.23, 0.28, 0.23, 0.13}; */
+/* fixed-point: sum of coef = 32767 to avoid overflow on DC */
+static Word16 h_fir[L_FIR] = {4260, 7536, 9175, 7536, 4260};
+
+
+void LP_Decim2(
+     Word16 x[],                           /* in/out: signal to process         */
+     Word16 l,                             /* input : size of filtering         */
+     Word16 mem[]                          /* in/out: memory (size=3)           */
+)
+{
+    Word16 *p_x, x_buf[L_FRAME + L_MEM];
+    Word16 i, j, k;
+    Word32 L_tmp;
+
+    /* copy initial filter states into buffer */
+
+    p_x = x_buf;                           
+    for (i = 0; i < L_MEM; i++)
+    {
+        *p_x++ = mem[i];                   
+    }
+    for (i = 0; i < l; i++)
+    {
+        *p_x++ = x[i];                     
+    }
+    for (i = 0; i < L_MEM; i++)
+    {
+        mem[i] = x[l - L_MEM + i];         
+    }
+
+    for (i = 0, j = 0; i < l; i += 2, j++)
+    {
+        p_x = &x_buf[i];                   
+
+        L_tmp = 0L;                        
+        for (k = 0; k < L_FIR; k++)
+            L_tmp = L_mac(L_tmp, *p_x++, h_fir[k]);
+
+        x[j] = round(L_tmp);               
+    }
+
+    return;
+/*-----------------------------------------------------------------------*
+ *                         RESIDU.C										 *
+ *-----------------------------------------------------------------------*
+ * Compute the LPC residual by filtering the input speech through A(z)   *
+ *-----------------------------------------------------------------------*/
+
+
+void Residu(
+     Word16 a[],                           /* (i) Q12 : prediction coefficients                     */
+     Word16 m,                             /* (i)     : order of LP filter                          */
+     Word16 x[],                           /* (i)     : speech (values x[-m..-1] are needed         */
+     Word16 y[],                           /* (o) x2  : residual signal                             */
+     Word16 lg                             /* (i)     : size of filtering                           */
+)
+{
+    Word16 i, j;
+    Word32 s;
+
+    for (i = 0; i < lg; i++)
+    {
+        s = L_mult(x[i], a[0]);
+
+        for (j = 1; j <= m; j++)
+            s = L_mac(s, a[j], x[i - j]);
+
+        s = L_shl(s, 3 + 1);               /* saturation can occur here */
+        y[i] = round(s);                   
+    }
+
+    return;
+}
+}
+
+/*------------------------------------------------------------------------*
+ *                         P_MED_OL.C									  *
+ *------------------------------------------------------------------------*
+ * Compute the open loop pitch lag.										  *
+ *------------------------------------------------------------------------*/
+
+#include "p_med_ol.tab"
+
+
+Word16 Pitch_med_ol(                       /* output: open loop pitch lag                             */
+     Word16 wsp[],                         /* input : signal used to compute the open loop pitch      */
+                                           /*         wsp[-pit_max] to wsp[-1] should be known        */
+     Word16 L_min,                         /* input : minimum pitch lag                               */
+     Word16 L_max,                         /* input : maximum pitch lag                               */
+     Word16 L_frame,                       /* input : length of frame to compute pitch                */
+     Word16 L_0,                           /* input : old_ open-loop pitch                            */
+     Word16 * gain,                        /* output: normalize correlation of hp_wsp for the Lag     */
+     Word16 * hp_wsp_mem,                  /* i:o   : memory of the hypass filter for hp_wsp[] (lg=9) */
+     Word16 * old_hp_wsp,                  /* i:o   : hypass wsp[]                                    */
+     Word16 wght_flg                       /* input : is weighting function used                      */
+)
+{
+    Word16 i, j, Tm;
+    Word16 hi, lo;
+    Word16 *ww, *we, *hp_wsp;
+    Word16 exp_R0, exp_R1, exp_R2;
+    Word32 max, R0, R1, R2;
+
+    ww = &corrweight[198];
+    
+    we = &corrweight[98 + L_max - L_0];
+    
+
+    max = MIN_32;                          
+    Tm = 0;                                
+    for (i = L_max; i > L_min; i--)
+    {
+        /* Compute the correlation */
+
+        R0 = 0;                            
+        for (j = 0; j < L_frame; j++)
+            R0 = L_mac(R0, wsp[j], wsp[j - i]);
+
+        /* Weighting of the correlation function.   */
+
+        L_Extract(R0, &hi, &lo);
+        R0 = Mpy_32_16(hi, lo, *ww);
+        ww--;
+
+        
+        
+        if ((L_0 > 0) && (wght_flg > 0))
+        {
+            /* Weight the neighbourhood of the old lag. */
+            L_Extract(R0, &hi, &lo);
+            R0 = Mpy_32_16(hi, lo, *we);
+            we--;
+            
+        }
+        
+        if (L_sub(R0, max) >= 0)
+        {
+            max = R0;
+            
+            Tm = i;
+            
+        }
+    }
+
+    /* Hypass the wsp[] vector */
+
+    hp_wsp = old_hp_wsp + L_max;           
+    Hp_wsp(wsp, hp_wsp, L_frame, hp_wsp_mem);
+
+    /* Compute normalize correlation at delay Tm */
+
+    R0 = 0;                                
+    R1 = 1L;                               
+    R2 = 1L;                               
+    for (j = 0; j < L_frame; j++)
+    {
+        R0 = L_mac(R0, hp_wsp[j], hp_wsp[j - Tm]);
+        R1 = L_mac(R1, hp_wsp[j - Tm], hp_wsp[j - Tm]);
+        R2 = L_mac(R2, hp_wsp[j], hp_wsp[j]);
+    }
+
+    /* gain = R0/ sqrt(R1*R2) */
+
+    exp_R0 = norm_l(R0);
+    R0 = L_shl(R0, exp_R0);
+
+    exp_R1 = norm_l(R1);
+    R1 = L_shl(R1, exp_R1);
+
+    exp_R2 = norm_l(R2);
+    R2 = L_shl(R2, exp_R2);
+
+
+    R1 = L_mult(round(R1), round(R2));
+
+    i = norm_l(R1);
+    R1 = L_shl(R1, i);
+
+    exp_R1 = add(exp_R1, exp_R2);
+    exp_R1 = add(exp_R1, i);
+    exp_R1 = sub(62, exp_R1);
+
+    Isqrt_n(&R1, &exp_R1);
+
+    R0 = L_mult(round(R0), round(R1));
+    exp_R0 = sub(31, exp_R0);
+    exp_R0 = add(exp_R0, exp_R1);
+
+    *gain = round(L_shl(R0, exp_R0));
+    
+
+    /* Shitf hp_wsp[] for next frame */
+
+    for (i = 0; i < L_max; i++)
+    {
+        old_hp_wsp[i] = old_hp_wsp[i + L_frame];
+        
+    }
+
+    return (Tm);
+}
+
+/*____________________________________________________________________
+ |
+ |
+ |  FUNCTION NAME median5
+ |
+ |      Returns the median of the set {X[-2], X[-1],..., X[2]},
+ |      whose elements are 16-bit integers.
+ |
+ |  INPUT
+ |      X[-2:2]   16-bit integers.
+ |
+ |  RETURN VALUE
+ |      The median of {X[-2], X[-1],..., X[2]}.
+ |_____________________________________________________________________
+ */
+
+Word16 median5(Word16 x[])
+{
+    Word16 x1, x2, x3, x4, x5;
+    Word16 tmp;
+
+    x1 = x[-2];                            
+    x2 = x[-1];                            
+    x3 = x[0];                             
+    x4 = x[1];                             
+    x5 = x[2];                             
+
+    
+
+    if (sub(x2, x1) < 0)
+    {
+        tmp = x1;
+        x1 = x2;
+        x2 = tmp;                          
+    }
+    if (sub(x3, x1) < 0)
+    {
+        tmp = x1;
+        x1 = x3;
+        x3 = tmp;                          
+    }
+    if (sub(x4, x1) < 0)
+    {
+        tmp = x1;
+        x1 = x4;
+        x4 = tmp;                          
+    }
+    if (sub(x5, x1) < 0)
+    {
+        x5 = x1;                           
+    }
+    if (sub(x3, x2) < 0)
+    {
+        tmp = x2;
+        x2 = x3;
+        x3 = tmp;                          
+    }
+    if (sub(x4, x2) < 0)
+    {
+        tmp = x2;
+        x2 = x4;
+        x4 = tmp;                          
+    }
+    if (sub(x5, x2) < 0)
+    {
+        x5 = x2;                           
+    }
+    if (sub(x4, x3) < 0)
+    {
+        x3 = x4;                           
+    }
+    if (sub(x5, x3) < 0)
+    {
+        x3 = x5;                           
+    }
+    return (x3);
+}
+
+/*____________________________________________________________________
+ |
+ |
+ |  FUNCTION NAME med_olag
+ |
+ |
+ |_____________________________________________________________________
+ */
+
+
+Word16 Med_olag(                           /* output : median of  5 previous open-loop lags       */
+     Word16 prev_ol_lag,                   /* input  : previous open-loop lag                     */
+     Word16 old_ol_lag[5]
+)
+{
+    Word16 i;
+
+    /* Use median of 5 previous open-loop lags as old lag */
+
+    for (i = 4; i > 0; i--)
+    {
+        old_ol_lag[i] = old_ol_lag[i - 1]; 
+    }
+
+    old_ol_lag[0] = prev_ol_lag;           
+
+    i = median5(&old_ol_lag[2]);
+
+    return i;
+
+}
+
+/*-----------------------------------------------------------------*
+ *   Funtion  init_coder                                           *
+ *            ~~~~~~~~~~                                           *
+ *   ->Initialization of variables for the coder section.          *
+ *-----------------------------------------------------------------*/
+
+void Init_coder(void **spe_state)
+{
+    Coder_State *st;
+
+    *spe_state = NULL;
+
+    /*-------------------------------------------------------------------------*
+     * Memory allocation for coder state.                                      *
+     *-------------------------------------------------------------------------*/
+
+    if ((st = (Coder_State *) malloc(sizeof(Coder_State))) == NULL)
+    {
+        printf("Can not malloc Coder_State structure!\n");
+        return;
+    }
+    st->vadSt = NULL;                      
+    st->dtx_encSt = NULL;                  
+
+    wb_vad_init(&(st->vadSt));
+    dtx_enc_init(&(st->dtx_encSt), isf_init);
+
+    Reset_encoder((void *) st, 1);
+
+    *spe_state = (void *) st;
+
+    return;
+}
+
+
+void Reset_encoder(void *st, Word16 reset_all)
+{
+    Word16 i;
+
+    Coder_State *cod_state;
+
+    cod_state = (Coder_State *) st;
+
+    Set_zero(cod_state->old_exc, PIT_MAX + L_INTERPOL);
+    Set_zero(cod_state->mem_syn, M);
+    Set_zero(cod_state->past_isfq, M);
+
+    cod_state->mem_w0 = 0;                 
+    cod_state->tilt_code = 0;              
+    cod_state->first_frame = 1;            
+
+    Init_gp_clip(cod_state->gp_clip);
+
+    cod_state->L_gc_thres = 0;             
+
+    if (reset_all != 0)
+    {
+        /* Static vectors to zero */
+
+        Set_zero(cod_state->old_speech, L_TOTAL - L_FRAME);
+        Set_zero(cod_state->old_wsp, (PIT_MAX / OPL_DECIM));
+        Set_zero(cod_state->mem_decim2, 3);
+
+        /* routines initialization */
+
+        Init_Decim_12k8(cod_state->mem_decim);
+        Init_HP50_12k8(cod_state->mem_sig_in);
+        Init_Levinson(cod_state->mem_levinson);
+        Init_Q_gain2(cod_state->qua_gain);
+        Init_Hp_wsp(cod_state->hp_wsp_mem);
+
+        /* isp initialization */
+
+        Copy(isp_init, cod_state->ispold, M);
+        Copy(isp_init, cod_state->ispold_q, M);
+
+        /* variable initialization */
+
+        cod_state->mem_preemph = 0;        
+        cod_state->mem_wsp = 0;            
+        cod_state->Q_old = 15;             
+        cod_state->Q_max[0] = 15;          
+        cod_state->Q_max[1] = 15;          
+        cod_state->old_wsp_max = 0;        
+        cod_state->old_wsp_shift = 0;      
+
+        /* pitch ol initialization */
+
+        cod_state->old_T0_med = 40;        
+        cod_state->ol_gain = 0;            
+        cod_state->ada_w = 0;              
+        cod_state->ol_wght_flg = 0;        
+        for (i = 0; i < 5; i++)
+        {
+            cod_state->old_ol_lag[i] = 40; 
+        }
+        Set_zero(cod_state->old_hp_wsp, (L_FRAME / 2) / OPL_DECIM + (PIT_MAX / OPL_DECIM));
+
+        Set_zero(cod_state->mem_syn_hf, M);
+        Set_zero(cod_state->mem_syn_hi, M);
+        Set_zero(cod_state->mem_syn_lo, M);
+
+        Init_HP50_12k8(cod_state->mem_sig_out);
+        Init_Filt_6k_7k(cod_state->mem_hf);
+        Init_HP400_12k8(cod_state->mem_hp400);
+
+        Copy(isf_init, cod_state->isfold, M);
+
+        cod_state->mem_deemph = 0;         
+
+        cod_state->seed2 = 21845;          
+
+        Init_Filt_6k_7k(cod_state->mem_hf2);
+        cod_state->gain_alpha = 32767;     
+
+        cod_state->vad_hist = 0;
+
+        wb_vad_reset(cod_state->vadSt);
+        dtx_enc_reset(cod_state->dtx_encSt, isf_init);
+    }
+    return;
+}
+
+void Close_coder(void *spe_state)
+{
+    wb_vad_exit(&(((Coder_State *) spe_state)->vadSt));
+    dtx_enc_exit(&(((Coder_State *) spe_state)->dtx_encSt));
+    free(spe_state);
+
+    return;
+}
+
+/*-----------------------------------------------------------------*
+ *   Funtion  coder                                                *
+ *            ~~~~~                                                *
+ *   ->Main coder routine.                                         *
+ *                                                                 *
+ *-----------------------------------------------------------------*/
+
+void coder(
+     Word16 speech16k[],                   /* input :  320 new speech samples (at 16 kHz)    */
+     Word16 * ser_size,                    /* output:  bit rate of the used mode             */
+     void *spe_state,                      /* i/o   :  State structure                       */
+     Word16 *flag_VAD					   /* VAD_flag										*/
+)
+{
+
+    /* Coder states */
+    Coder_State *st;
+
+    /* Speech vector */
+    Word16 old_speech[L_TOTAL];
+    Word16 *new_speech, *speech, *p_window;
+
+    /* Weighted speech vector */
+    Word16 old_wsp[L_FRAME + (PIT_MAX / OPL_DECIM)];
+    Word16 *wsp;
+
+    /* LPC coefficients */
+
+    Word16 r_h[M + 1], r_l[M + 1];         /* Autocorrelations of windowed speech  */
+    Word16 rc[M];                          /* Reflection coefficients.             */
+    Word16 Ap[M + 1];                      /* A(z) with spectral expansion         */
+    Word16 ispnew[M];                      /* immittance spectral pairs at 4nd sfr */
+    Word16 isf[M];                         /* ISF (frequency domain) at 4nd sfr    */
+    Word16 *p_A;                    /* ptr to A(z) for the 4 subframes      */
+    Word16 A[NB_SUBFR * (M + 1)];          /* A(z) unquantized for the 4 subframes */
+
+    /* Other vectors */
+
+    Word16 code[L_SUBFR];                  /* Fixed codebook excitation          */
+    Word16 error[M + L_SUBFR];             /* error of quantization              */
+    Word16 buf[L_FRAME];                   /* VAD buffer                         */
+
+    /* Scalars */
+
+    Word16 i, i_subfr, vad_flag;
+    Word16 T_op, T_op2;
+    Word16 tmp, exp, Q_new, mu, shift, max;
+
+    Word32 L_tmp, L_max;
+
+
+
+    st = (Coder_State *) spe_state;
+
+    *ser_size = nb_of_bits[0];         
+
+    /*--------------------------------------------------------------------------*
+     *          Initialize pointers to speech vector.                           *
+     *                                                                          *
+     *                                                                          *
+     *                    |-------|-------|-------|-------|-------|-------|     *
+     *                     past sp   sf1     sf2     sf3     sf4    L_NEXT      *
+     *                    <-------  Total speech buffer (L_TOTAL)   ------>     *
+     *              old_speech                                                  *
+     *                    <-------  LPC analysis window (L_WINDOW)  ------>     *
+     *                    |       <-- present frame (L_FRAME) ---->             *
+     *                   p_window |       <----- new speech (L_FRAME) ---->     *
+     *                            |       |                                     *
+     *                          speech    |                                     *
+     *                                 new_speech                               *
+     *--------------------------------------------------------------------------*/
+
+    new_speech = old_speech + L_TOTAL - L_FRAME - L_FILT;         /* New speech     */
+    speech = old_speech + L_TOTAL - L_FRAME - L_NEXT;     /* Present frame  */
+    p_window = old_speech + L_TOTAL - L_WINDOW; 
+
+    wsp = old_wsp + (PIT_MAX / OPL_DECIM); 
+
+    /* copy coder memory state into working space (internal memory for DSP) */
+
+    Copy(st->old_speech, old_speech, L_TOTAL - L_FRAME);
+    Copy(st->old_wsp, old_wsp, PIT_MAX / OPL_DECIM);
+
+    /*---------------------------------------------------------------*
+     * Down sampling signal from 16kHz to 12.8kHz                    *
+     * -> The signal is extended by L_FILT samples (padded to zero)  *
+     * to avoid additional delay (L_FILT samples) in the coder.      *
+     * The last L_FILT samples are approximated after decimation and *
+     * are used (and windowed) only in autocorrelations.             *
+     *---------------------------------------------------------------*/
+
+    Decim_12k8(speech16k, L_FRAME16k, new_speech, st->mem_decim);
+
+    /* last L_FILT samples for autocorrelation window */
+    Copy(st->mem_decim, code, 2 * L_FILT16k);
+    Set_zero(error, L_FILT16k);            /* set next sample to zero */
+    Decim_12k8(error, L_FILT16k, new_speech + L_FRAME, code);
+
+    /*---------------------------------------------------------------*
+     * Perform 50Hz HP filtering of input signal.                    *
+     *---------------------------------------------------------------*/
+
+    HP50_12k8(new_speech, L_FRAME, st->mem_sig_in);
+
+    /* last L_FILT samples for autocorrelation window */
+    Copy(st->mem_sig_in, code, 6);
+    HP50_12k8(new_speech + L_FRAME, L_FILT, code);
+
+    /*---------------------------------------------------------------*
+     * Perform fixed preemphasis through 1 - g z^-1                  *
+     * Scale signal to get maximum of precision in filtering         *
+     *---------------------------------------------------------------*/
+
+    mu = shr(PREEMPH_FAC, 1);              /* Q15 --> Q14 */
+
+    /* get max of new preemphased samples (L_FRAME+L_FILT) */
+
+    L_tmp = L_mult(new_speech[0], 16384);
+    L_tmp = L_msu(L_tmp, st->mem_preemph, mu);
+    L_max = L_abs(L_tmp);
+
+    for (i = 1; i < L_FRAME + L_FILT; i++)
+    {
+        L_tmp = L_mult(new_speech[i], 16384);
+        L_tmp = L_msu(L_tmp, new_speech[i - 1], mu);
+        L_tmp = L_abs(L_tmp);
+        
+        if (L_sub(L_tmp, L_max) > (Word32) 0)
+        {
+            L_max = L_tmp;                 
+        }
+    }
+
+    /* get scaling factor for new and previous samples */
+    /* limit scaling to Q_MAX to keep dynamic for ringing in low signal */
+    /* limit scaling to Q_MAX also to avoid a[0]<1 in syn_filt_32 */
+    tmp = extract_h(L_max);
+    
+    if (tmp == 0)
+    {
+        shift = Q_MAX;                     
+    } else
+    {
+        shift = sub(norm_s(tmp), 1);
+        
+        if (shift < 0)
+        {
+            shift = 0;                     
+        }
+        
+        if (sub(shift, Q_MAX) > 0)
+        {
+            shift = Q_MAX;                 
+        }
+    }
+    Q_new = shift;                         
+    
+    if (sub(Q_new, st->Q_max[0]) > 0)
+    {
+        Q_new = st->Q_max[0];              
+    }
+    
+    if (sub(Q_new, st->Q_max[1]) > 0)
+    {
+        Q_new = st->Q_max[1];              
+    }
+    exp = sub(Q_new, st->Q_old);
+    st->Q_old = Q_new;                     
+    st->Q_max[1] = st->Q_max[0];           
+    st->Q_max[0] = shift;                  
+
+    /* preemphasis with scaling (L_FRAME+L_FILT) */
+
+    tmp = new_speech[L_FRAME - 1];         
+
+    for (i = L_FRAME + L_FILT - 1; i > 0; i--)
+    {
+        L_tmp = L_mult(new_speech[i], 16384);
+        L_tmp = L_msu(L_tmp, new_speech[i - 1], mu);
+        L_tmp = L_shl(L_tmp, Q_new);
+        new_speech[i] = round(L_tmp);      
+    }
+
+    L_tmp = L_mult(new_speech[0], 16384);
+    L_tmp = L_msu(L_tmp, st->mem_preemph, mu);
+    L_tmp = L_shl(L_tmp, Q_new);
+    new_speech[0] = round(L_tmp);          
+
+    st->mem_preemph = tmp;                 
+
+    /* scale previous samples and memory */
+
+    Scale_sig(old_speech, L_TOTAL - L_FRAME - L_FILT, exp);
+    Scale_sig(st->mem_syn, M, exp);
+    Scale_sig(st->mem_decim2, 3, exp);
+    Scale_sig(&(st->mem_wsp), 1, exp);
+    Scale_sig(&(st->mem_w0), 1, exp);
+
+    /*------------------------------------------------------------------------*
+     *  Call VAD                                                              *
+     *  Preemphesis scale down signal in low frequency and keep dynamic in HF.*
+     *  Vad work slightly in futur (new_speech = speech + L_NEXT - L_FILT).   *
+     *------------------------------------------------------------------------*/
+
+    Copy(new_speech, buf, L_FRAME);
+
+    Scale_sig(buf, L_FRAME, sub(1, Q_new));
+
+    vad_flag = wb_vad(st->vadSt, buf);
+
+	/* Export flag_VAD */
+	if (vad_flag == 0)
+		{
+		*flag_VAD = 0; 		// 16 bit 0
+		}
+	else
+		{
+		*flag_VAD = -1;		// 16 bit 1   
+		}
+    if (vad_flag == 0)
+    {
+        st->vad_hist = add(st->vad_hist, 1);        
+    } else
+    {
+        st->vad_hist = 0;              
+    }
+
+    /*------------------------------------------------------------------------*
+     *  Perform LPC analysis                                                  *
+     *  ~~~~~~~~~~~~~~~~~~~~                                                  *
+     *   - autocorrelation + lag windowing                                    *
+     *   - Levinson-durbin algorithm to find a[]                              *
+     *   - convert a[] to isp[]                                               *
+     *   - convert isp[] to isf[] for quantization                            *
+     *   - quantize and code the isf[]                                        *
+     *   - convert isf[] to isp[] for interpolation                           *
+     *   - find the interpolated ISPs and convert to a[] for the 4 subframes  *
+     *------------------------------------------------------------------------*/
+
+    /* LP analysis centered at 4nd subframe */
+    Autocorr(p_window, M, r_h, r_l);       /* Autocorrelations */
+    Lag_window(r_h, r_l);                  /* Lag windowing    */
+    Levinson(r_h, r_l, A, rc, st->mem_levinson);        /* Levinson Durbin  */
+    Az_isp(A, ispnew, st->ispold);         /* From A(z) to ISP */
+
+    /* Find the interpolated ISPs and convert to a[] for all subframes */
+    Int_isp(st->ispold, ispnew, interpol_frac, A);
+
+    /* update ispold[] for the next frame */
+    Copy(ispnew, st->ispold, M);
+
+    /* Convert ISPs to frequency domain 0..6400 */
+    Isp_isf(ispnew, isf, M);
+
+
+    /*----------------------------------------------------------------------*
+     *  Perform PITCH_OL analysis                                           *
+     *  ~~~~~~~~~~~~~~~~~~~~~~~~~                                           *
+     * - Find the residual res[] for the whole speech frame                 *
+     * - Find the weighted input speech wsp[] for the whole speech frame    *
+     * - scale wsp[] to avoid overflow in pitch estimation                  *
+     * - Find open loop pitch lag for whole speech frame                    *
+     *----------------------------------------------------------------------*/
+
+    p_A = A;                               
+    for (i_subfr = 0; i_subfr < L_FRAME; i_subfr += L_SUBFR)
+    {
+        Weight_a(p_A, Ap, GAMMA1, M);
+        Residu(Ap, M, &speech[i_subfr], &wsp[i_subfr], L_SUBFR);
+        p_A += (M + 1);                    
+    }
+    Deemph2(wsp, TILT_FAC, L_FRAME, &(st->mem_wsp));
+
+    /* find maximum value on wsp[] for 12 bits scaling */
+    max = 0;                               
+    for (i = 0; i < L_FRAME; i++)
+    {
+        tmp = abs_s(wsp[i]);
+        
+        if (sub(tmp, max) > 0)
+        {
+            max = tmp;                     
+        }
+    }
+    tmp = st->old_wsp_max;                 
+    
+    if (sub(max, tmp) > 0)
+    {
+        tmp = max;                         /* tmp = max(wsp_max, old_wsp_max) */
+        
+    }
+    st->old_wsp_max = max;                 
+
+    shift = sub(norm_s(tmp), 3);
+    
+    if (shift > 0)
+    {
+        shift = 0;                         /* shift = 0..-3 */
+        
+    }
+    /* decimation of wsp[] to search pitch in LF and to reduce complexity */
+    LP_Decim2(wsp, L_FRAME, st->mem_decim2);
+
+    /* scale wsp[] in 12 bits to avoid overflow */
+    Scale_sig(wsp, L_FRAME / OPL_DECIM, shift);
+
+    /* scale old_wsp (warning: exp must be Q_new-Q_old) */
+    exp = add(exp, sub(shift, st->old_wsp_shift));
+    st->old_wsp_shift = shift;
+    Scale_sig(old_wsp, PIT_MAX / OPL_DECIM, exp);
+    Scale_sig(st->old_hp_wsp, PIT_MAX / OPL_DECIM, exp);
+    scale_mem_Hp_wsp(st->hp_wsp_mem, exp);
+
+    /* Find open loop pitch lag for whole speech frame */
+
+    
+    if (sub(*ser_size, NBBITS_7k) == 0)
+    {
+        /* Find open loop pitch lag for whole speech frame */
+        T_op = Pitch_med_ol(wsp, PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
+            L_FRAME / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
+    } else
+    {
+        /* Find open loop pitch lag for first 1/2 frame */
+        T_op = Pitch_med_ol(wsp, PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
+            (L_FRAME / 2) / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
+    }
+
+    
+    if (sub(st->ol_gain, 19661) > 0)       /* 0.6 in Q15 */
+    {
+        st->old_T0_med = Med_olag(T_op, st->old_ol_lag);        
+        st->ada_w = 32767;                 
+    } else
+    {
+        st->ada_w = mult(st->ada_w, 29491);
+    }
+
+    
+    if (sub(st->ada_w, 26214) < 0)
+        st->ol_wght_flg = 0;
+    else
+        st->ol_wght_flg = 1;
+
+    wb_vad_tone_detection(st->vadSt, st->ol_gain);
+
+    T_op *= OPL_DECIM;                     
+
+    
+    if (sub(*ser_size, NBBITS_7k) != 0)
+    {
+        /* Find open loop pitch lag for second 1/2 frame */
+        T_op2 = Pitch_med_ol(wsp + ((L_FRAME / 2) / OPL_DECIM), PIT_MIN / OPL_DECIM, PIT_MAX / OPL_DECIM,
+            (L_FRAME / 2) / OPL_DECIM, st->old_T0_med, &(st->ol_gain), st->hp_wsp_mem, st->old_hp_wsp, st->ol_wght_flg);
+
+        
+        if (sub(st->ol_gain, 19661) > 0)   /* 0.6 in Q15 */
+        {
+            st->old_T0_med = Med_olag(T_op2, st->old_ol_lag);   
+            st->ada_w = 32767;             
+        } else
+        {
+            st->ada_w = mult(st->ada_w, 29491); 
+        }
+
+        
+        if (sub(st->ada_w, 26214) < 0)
+            st->ol_wght_flg = 0;
+        else
+            st->ol_wght_flg = 1;
+
+        wb_vad_tone_detection(st->vadSt, st->ol_gain);
+
+        T_op2 *= OPL_DECIM;                
+
+    } else
+    {
+        T_op2 = T_op;                      
+    }
+
+
+
+    /*--------------------------------------------------*
+     * Update signal for next frame.                    *
+     * -> save past of speech[] and wsp[].              *
+     *--------------------------------------------------*/
+
+    Copy(&old_speech[L_FRAME], st->old_speech, L_TOTAL - L_FRAME);
+    Copy(&old_wsp[L_FRAME / OPL_DECIM], st->old_wsp, PIT_MAX / OPL_DECIM);
+
+
+    return;
+}
 
